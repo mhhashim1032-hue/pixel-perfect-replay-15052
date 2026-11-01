@@ -16,7 +16,7 @@ describe("agent event stream decoder", () => {
 
   it("flushes a final event without a trailing newline", () => {
     const decoder = createAgentEventDecoder();
-    expect(decoder.push(encode('{"t":"usage","input":12,"output":0'))).toEqual([]);
+    expect(decoder.push(encode('{"t":"usage","input":12,"output":0}'))).toEqual([]);
     expect(decoder.finish()).toEqual([{ t: "usage", input: 12, output: 0 }]);
   });
 
