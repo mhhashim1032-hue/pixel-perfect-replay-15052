@@ -23,6 +23,7 @@ import { Route as AuthenticatedSIdRouteImport } from './routes/_authenticated/s.
 import { Route as ApiPreviewSplatRouteImport } from './routes/api/preview.$'
 import { Route as ApiPublicOauthClientRouteImport } from './routes/api/public/oauth-client'
 import { Route as ApiPublicJobsResumeRunsRouteImport } from './routes/api/public/jobs/resume-runs'
+import { Route as ApiPublicJobsProjectSyncRouteImport } from './routes/api/public/jobs/project-sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -93,6 +94,11 @@ const ApiPublicJobsResumeRunsRoute = ApiPublicJobsResumeRunsRouteImport.update({
   path: '/api/public/jobs/resume-runs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsProjectSyncRoute = ApiPublicJobsProjectSyncRouteImport.update({
+  id: '/api/public/jobs/project-sync',
+  path: '/api/public/jobs/project-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/api/preview/$': typeof ApiPreviewSplatRoute
   '/api/public/oauth-client': typeof ApiPublicOauthClientRoute
   '/api/public/jobs/resume-runs': typeof ApiPublicJobsResumeRunsRoute
+  '/api/public/jobs/project-sync': typeof ApiPublicJobsProjectSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -157,6 +164,7 @@ export interface FileRouteTypes {
     | '/api/preview/$'
     | '/api/public/oauth-client'
     | '/api/public/jobs/resume-runs'
+    | '/api/public/jobs/project-sync'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -201,6 +209,7 @@ export interface RootRouteChildren {
   ApiPreviewSplatRoute: typeof ApiPreviewSplatRoute
   ApiPublicOauthClientRoute: typeof ApiPublicOauthClientRoute
   ApiPublicJobsResumeRunsRoute: typeof ApiPublicJobsResumeRunsRoute
+  ApiPublicJobsProjectSyncRoute: typeof ApiPublicJobsProjectSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -302,6 +311,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/jobs/resume-runs'
       preLoaderRoute: typeof ApiPublicJobsResumeRunsRouteImport
       parentRoute: typeof rootRouteImport
+    },
+    '/api/public/jobs/project-sync': {
+      id: '/api/public/jobs/project-sync'
+      path: '/api/public/jobs/project-sync'
+      fullPath: '/api/public/jobs/project-sync'
+      preLoaderRoute: typeof ApiPublicJobsProjectSyncRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -334,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPreviewSplatRoute: ApiPreviewSplatRoute,
   ApiPublicOauthClientRoute: ApiPublicOauthClientRoute,
   ApiPublicJobsResumeRunsRoute: ApiPublicJobsResumeRunsRoute,
+  ApiPublicJobsProjectSyncRoute: ApiPublicJobsProjectSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
