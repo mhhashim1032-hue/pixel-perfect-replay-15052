@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIVE_TEAM_WORKERS, MAX_TEAM_JOBS, ownsPath, parallelMap, proposalConflict, teamSchema } from "@/lib/agent-team";
+import { ACTIVE_TEAM_WORKERS, MAX_TEAM_JOBS, ownsPath, parallelMap, proposalConflict, scheduleWaves, teamSchema } from "@/lib/agent-team";
 
 describe("master-controlled agent team", () => {
   it("accepts twelve jobs including coders and rejects larger teams", () => {
@@ -33,6 +33,19 @@ describe("master-controlled agent team", () => {
     const proposal = { id: "p1", path: "src/ui.tsx", content: "new", original: "old", label: "UI" };
     expect(proposalConflict(proposal, "old")).toBeNull();
     expect(proposalConflict(proposal, "someone else's edit")).not.toBeNull();
+  });
+
+  it("rejects duplicate dependency labels instead of silently binding the wrong job", () => {
+    expect(() => scheduleWaves([{ label: "build" }, { label: "build" }])).toThrow(/Duplicate job label/);
+  });
+  it("stops assigning queued work after a worker fails", async () => {
+    let called = 0;
+    await expect(parallelMap([1, 2, 3, 4], 1, async (value) => {
+      called++;
+      if (value === 1) throw new Error("worker failed");
+      return value;
+    })).rejects.toThrow("worker failed");
+    expect(called).toBe(1);
   });
   it("accepts a whole team sent as a JSON string and still rejects malformed text", () => {
     const job = { label: "UI", role: "coder", task: "Implement UI", paths: ["src/ui.tsx"] };
