@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 import { buildProjectSyncPlan, type SyncOperation } from "./project-control-plane";
 import { validIdempotencyKey } from "./project-sync-state";
@@ -48,6 +47,7 @@ export const createProjectSyncJob = createServerFn({ method: "POST" })
       pendingMigrations: 0,
     });
     if (!plan.canStart) throw new Error("Project is not ready to sync. Connect and pin the required customer accounts and resources first.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing, error: findError } = await supabaseAdmin.from("project_sync_jobs").select("id,status,summary").eq("task_id", task.id).eq("user_id", context.userId).eq("idempotency_key", data.idempotencyKey).maybeSingle();
     if (findError) throw new Error("Could not check existing sync request.");
     if (existing) return { jobId: existing.id, status: existing.status, plan: existing.summary?.plan ?? plan, reused: true };
