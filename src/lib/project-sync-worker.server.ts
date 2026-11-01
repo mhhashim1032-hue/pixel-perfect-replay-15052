@@ -3,7 +3,6 @@ import { accountToken } from "./accounts.server";
 import { cleanAccounts } from "./accounts";
 
 const db: any = supabaseAdmin;
-const WORKER_ID = `forge-sync-${crypto.randomUUID()}`;
 const LEASE_SECONDS = 90;
 
 type ClaimedJob = {
@@ -16,9 +15,9 @@ function safeMessage(error: unknown) {
   return message.replace(/Bearer\s+\S+/gi, "Bearer [redacted]").slice(0, 300);
 }
 
-async function finish(job: ClaimedJob, status: "failed" | "waiting_approval" | "succeeded", summary: Record<string, unknown>) {
+async function finish(job: ClaimedJob, workerId: string, status: "failed" | "waiting_approval" | "succeeded", summary: Record<string, unknown>) {
   const { data, error } = await db.rpc("finish_project_sync_job", {
-    p_job_id: job.id, p_worker_id: WORKER_ID, p_status: status, p_summary: summary,
+    p_job_id: job.id, p_worker_id: workerId, p_status: status, p_summary: summary,
   });
   if (error || data !== true) throw new Error("Sync worker lost its lease before completion.");
 }
@@ -62,8 +61,9 @@ async function runReadOnlyOperation(operation: string, task: any, tokens: Partia
 
 /** Processes at most one claimed job. This first worker release intentionally performs read-only checks only. */
 export async function runProjectSyncWorker() {
+  const workerId = `forge-sync-${crypto.randomUUID()}`;
   const { data: claimed, error: claimError } = await db.rpc("claim_project_sync_job", {
-    p_worker_id: WORKER_ID, p_lease_seconds: LEASE_SECONDS,
+    p_worker_id: workerId, p_lease_seconds: LEASE_SECONDS,
   });
   if (claimError) throw new Error("Sync job claim failed.");
   const job = (Array.isArray(claimed) ? claimed[0] : claimed) as ClaimedJob | null;
@@ -88,10 +88,10 @@ export async function runProjectSyncWorker() {
     if (!github || task.supabase_ref && !supabase || task.vercel_project_id && !vercel) {
       throw new Error("A pinned customer account is no longer connected. No alternate account was selected.");
     }
-    const tokens = { github, supabase: supabase ?? undefined, vercel: vercel ?? undefined };
+    const tokens: Partial<Record<"github" | "supabase" | "vercel", string>> = { github, ...(supabase ? { supabase } : {}), ...(vercel ? { vercel } : {}) };
 
     const { data: steps, error: stepsError } = await db.from("project_sync_steps")
-      .select("id,operation,status,depends_on,requires_approval,approved_at")
+      .select("id,operation,status,depends_on,requires_approval,approved_at,attempt")
       .eq("job_id", job.id).eq("task_id", job.task_id).eq("user_id", job.user_id).order("created_at");
     if (stepsError) throw new Error("Sync steps could not be loaded.");
 
@@ -117,29 +117,30 @@ export async function runProjectSyncWorker() {
         outcomes.push({ operation: step.operation, status: "succeeded", result });
         if (step.operation === "inspect_repository" && result && typeof result === "object" && "commitSha" in result) {
           const sha = (result as { commitSha: string }).commitSha;
-          await db.from("project_sync_jobs").update({ source_commit_sha: sha, updated_at: new Date().toISOString() }).eq("id", job.id).eq("user_id", job.user_id).eq("lease_owner", WORKER_ID);
+          await db.from("project_sync_jobs").update({ source_commit_sha: sha, updated_at: new Date().toISOString() }).eq("id", job.id).eq("user_id", job.user_id).eq("lease_owner", workerId);
         }
       } catch (error) {
         const message = safeMessage(error);
         const code = message.includes("not enabled") ? "executor_not_enabled" : "provider_check_failed";
-        await stepStatus(step.id, "failed", { error_code: code, error_summary: message, finished_at: new Date().toISOString() });
+        await stepStatus(job.user_id, step.id, "failed", { error_code: code, error_summary: message, finished_at: new Date().toISOString() });
         outcomes.push({ operation: step.operation, status: "failed", error: message });
         break;
       }
       const { data: renewed, error: renewError } = await db.rpc("renew_project_sync_job_lease", {
-        p_job_id: job.id, p_worker_id: WORKER_ID, p_lease_seconds: LEASE_SECONDS,
+        p_job_id: job.id, p_worker_id: workerId, p_lease_seconds: LEASE_SECONDS,
       });
       if (renewError || renewed !== true) throw new Error("Sync worker lease expired; stopping safely.");
     }
 
     const waiting = outcomes.some((o) => o.status === "waiting_approval");
-    const failed = outcomes.some((o) => o.status === "failed" || o.status === "blocked");
-    const status = waiting && !failed ? "waiting_approval" : failed ? "failed" : "succeeded";
-    await finish(job, status, { outcomes, workerVersion: 1, readOnly: true });
+    const failed = outcomes.some((o) => o.status === "failed");
+    const blocked = outcomes.some((o) => o.status === "blocked");
+    const status = waiting && !failed ? "waiting_approval" : failed || blocked ? "failed" : "succeeded";
+    await finish(job, workerId, status, { outcomes, workerVersion: 1, readOnly: true });
     return { claimed: true, processed: 1, jobId: job.id, status, outcomes };
   } catch (error) {
     const message = safeMessage(error);
-    try { await finish(job, "failed", { error: message, workerVersion: 1, readOnly: true }); } catch {}
+    try { await finish(job, workerId, "failed", { error: message, workerVersion: 1, readOnly: true }); } catch {}
     return { claimed: true, processed: 1, jobId: job.id, status: "failed", error: message };
   } finally {
   }
