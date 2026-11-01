@@ -5,6 +5,7 @@ describe("preview crash repair", () => {
   it("offers repair for server crashes and real browser errors", () => {
     expect(previewNeedsRepair("crashed", [])).toBe(true);
     expect(previewNeedsRepair("error", [])).toBe(true);
+    expect(previewNeedsRepair("unhealthy", [])).toBe(true);
     expect(previewNeedsRepair("ready", [{ m: "TypeError: rows.map is not a function", path: "/account" }])).toBe(true);
     expect(previewNeedsRepair("ready", [])).toBe(false);
     expect(previewNeedsRepair("starting", [])).toBe(false);
