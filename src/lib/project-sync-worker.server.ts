@@ -30,7 +30,6 @@ async function stepStatus(userId: string, id: string, status: string, patch: Rec
   if (error) throw new Error("Could not persist sync step state.");
 }
 
-let currentUserId = "";
 
 async function runReadOnlyOperation(operation: string, task: any, tokens: Partial<Record<"github" | "supabase" | "vercel", string>>) {
   if (operation === "inspect_repository") {
