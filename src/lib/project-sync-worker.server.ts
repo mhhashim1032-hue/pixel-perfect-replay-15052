@@ -70,7 +70,6 @@ export async function runProjectSyncWorker() {
   const job = (Array.isArray(claimed) ? claimed[0] : claimed) as ClaimedJob | null;
   if (!job) return { claimed: false, processed: 0 };
 
-  currentUserId = job.user_id;
   const outcomes: Array<{ operation: string; status: string; result?: unknown; error?: string }> = [];
   try {
     const { data: task, error: taskError } = await db.from("agent_sessions")
@@ -115,7 +114,7 @@ export async function runProjectSyncWorker() {
       await stepStatus(job.user_id, step.id, "running", { started_at: new Date().toISOString(), attempt: (step.attempt ?? 0) + 1 });
       try {
         const result = await runReadOnlyOperation(step.operation, task, tokens);
-        await stepStatus(step.id, "succeeded", { safe_result: result, finished_at: new Date().toISOString(), error_code: null, error_summary: null });
+        await stepStatus(job.user_id, step.id, "succeeded", { safe_result: result, finished_at: new Date().toISOString(), error_code: null, error_summary: null });
         outcomes.push({ operation: step.operation, status: "succeeded", result });
         if (step.operation === "inspect_repository" && result && typeof result === "object" && "commitSha" in result) {
           const sha = (result as { commitSha: string }).commitSha;
@@ -144,6 +143,5 @@ export async function runProjectSyncWorker() {
     try { await finish(job, "failed", { error: message, workerVersion: 1, readOnly: true }); } catch {}
     return { claimed: true, processed: 1, jobId: job.id, status: "failed", error: message };
   } finally {
-    currentUserId = "";
   }
 }
