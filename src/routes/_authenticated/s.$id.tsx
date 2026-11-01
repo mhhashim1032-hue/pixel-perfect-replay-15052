@@ -139,6 +139,7 @@ function Workspace() {
     }
   }, [id, input]);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [streamInterrupted, setStreamInterrupted] = useState(false);
   const capacity = promptCapacity(input);
   const [planMode, setPlanMode] = useState(false);
   const [usage, setUsage] = useState({ input: 0, output: 0 });
@@ -207,6 +208,7 @@ function Workspace() {
     const validationError = promptError(text);
     if (validationError) { setSendError(validationError); return; }
     setSendError(null);
+    setStreamInterrupted(false);
     const sentImages = images;
     let accepted = false;
     setInput("");
@@ -287,6 +289,10 @@ function Workspace() {
           setInput(text);
           setImages(sentImages);
           setMessages((ms) => ms.slice(0, -2));
+        } else {
+          // Server-side actions may have completed before the stream disconnected.
+          // Do not replay the original prompt automatically; offer a safe continuation.
+          setStreamInterrupted(true);
         }
       }
     } finally {
@@ -446,7 +452,7 @@ function Workspace() {
               />
             )}
             {stale && !running && <div className="mx-auto mb-2 flex max-w-3xl flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs"><p className="min-w-0 flex-1 text-foreground">No progress update for over 2 minutes. Your saved work is safe. {autoResumes.current >= 3 ? "Automatic recovery has reached its limit." : "Forge is checking whether the run can recover."}</p><Button type="button" size="sm" variant="outline" onClick={() => void session.refetch()} disabled={session.isFetching}>Check status</Button>{autoResumes.current >= 3 && <Button type="button" size="sm" onClick={() => { autoResumes.current = 0; resumedFor.current = null; void send("Continue from the latest saved progress. First inspect the current state and completed work; do not repeat completed steps."); }}>Resume task</Button>}<Button type="button" size="sm" variant="ghost" className="text-destructive" disabled={stopping} onClick={stopWork}><Square className="h-3 w-3" />{stopping ? "Stopping…" : "Stop run"}</Button></div>}
-            {sendError && <p role="alert" className="mx-auto mb-2 max-w-3xl break-words text-sm text-destructive">{sendError}</p>}
+            {sendError && <div role="alert" className="mx-auto mb-2 flex max-w-3xl flex-wrap items-center gap-2 text-sm"><p className="min-w-0 flex-1 break-words text-destructive">{sendError}</p>{streamInterrupted && <Button type="button" size="sm" variant="outline" disabled={running || bgRunning} onClick={() => void send("The previous response stream disconnected. Inspect the current repository and task state, identify what was completed, then continue only unfinished work. Do not repeat completed actions.")}>Continue from saved progress</Button>}</div>}
             {images.length > 0 && (
               <div className="mx-auto mb-2 flex max-w-3xl flex-wrap gap-2">
                 {images.map((im, i) => (
