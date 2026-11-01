@@ -27,7 +27,7 @@ export function redactPreviewDiagnostic(text: string): string {
 }
 
 export function previewNeedsRepair(status: string | undefined, errors: PreviewBrowserError[]): boolean {
-  return status === "crashed" || status === "error" || errors.length > 0;
+  return status === "crashed" || status === "error" || status === "unhealthy" || errors.length > 0;
 }
 
 /** Preserve actual error lines, paths and checks, without guessing a root cause. */
