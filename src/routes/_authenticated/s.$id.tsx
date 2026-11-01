@@ -317,7 +317,16 @@ function Workspace() {
           <ChangesView id={id} pending={pending} onResolved={(rem) => { setPending(rem ?? []); qc.invalidateQueries({ queryKey: ["diff", id] }); qc.invalidateQueries({ queryKey: ["tree", id] }); }} />
           <MemoryView repo={s.repo} />
           <div className="px-3 pb-8">
-            <Button variant="ghost" size="sm" className="text-destructive" onClick={async () => { await remove({ data: { id } }); nav({ to: "/app" }); }}>
+            <Button variant="ghost" size="sm" className="text-destructive" onClick={async () => {
+              if (!confirm("Delete this task from Forge? The GitHub branch and commits will remain untouched.")) return;
+              try {
+                await remove({ data: { id } });
+                toast.success("Task deleted");
+                nav({ to: "/app" });
+              } catch (error) {
+                toast.error("Could not delete task: " + (error as Error).message);
+              }
+            }}>
               <Trash2 /> Delete task (branch stays on GitHub)
             </Button>
           </div>
@@ -338,8 +347,15 @@ function Workspace() {
               className="h-7 shrink-0 rounded border bg-background px-1 font-mono text-xs hover:border-primary"
               value={asAutonomy(s.mode)}
               onChange={async (e) => {
-                await update({ data: { id, mode: e.target.value as Autonomy } });
-                qc.invalidateQueries({ queryKey: ["session", id] });
+                const nextMode = e.target.value as Autonomy;
+                try {
+                  await update({ data: { id, mode: nextMode } });
+                  toast.success("Autonomy level updated");
+                  await qc.invalidateQueries({ queryKey: ["session", id] });
+                } catch (error) {
+                  toast.error("Could not update autonomy: " + (error as Error).message);
+                  await qc.invalidateQueries({ queryKey: ["session", id] });
+                }
               }}
             >
               {AUTONOMY.map((a) => <option key={a} value={a}>{AUTONOMY_LABEL[a].title}</option>)}
@@ -354,7 +370,18 @@ function Workspace() {
           </div>
         )}
       </AppHeader>
-      <div className="flex min-h-0 flex-1">
+      {!s && (
+        <main className="mx-auto flex w-full max-w-xl flex-1 items-center justify-center p-5">
+          <section className="w-full rounded-xl border bg-card p-5 text-center">
+            {session.isLoading ? (
+              <><Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-primary" /><h1 className="font-semibold">Opening your workspace…</h1><p className="mt-1 text-sm text-muted-foreground">Loading the task, conversation and saved progress.</p></>
+            ) : (
+              <><h1 className="font-semibold">Could not open this task</h1><p role="alert" className="mt-2 break-words text-sm text-muted-foreground">{(session.error as Error | null)?.message ?? "This task may have been deleted or you may not have access."}</p><div className="mt-4 flex justify-center gap-2"><Button variant="outline" onClick={() => nav({ to: "/app" })}>Back to workspace</Button><Button onClick={() => session.refetch()} disabled={session.isFetching}>{session.isFetching ? <Loader2 className="animate-spin" /> : "Try again"}</Button></div></>
+            )}
+          </section>
+        </main>
+      )}
+      <div className={`${!s ? "hidden " : ""}flex min-h-0 flex-1`}>
         <section className={`${!desktop && view !== "chat" ? "hidden" : "flex"} min-w-0 flex-1 flex-col`}>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
             <div className="mx-auto max-w-3xl space-y-5">
