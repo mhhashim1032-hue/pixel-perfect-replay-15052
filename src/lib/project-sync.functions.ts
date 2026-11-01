@@ -48,7 +48,8 @@ export const createProjectSyncJob = createServerFn({ method: "POST" })
     });
     if (!plan.canStart) throw new Error("Project is not ready to sync. Connect and pin the required customer accounts and resources first.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: existing, error: findError } = await supabaseAdmin.from("project_sync_jobs").select("id,status,summary").eq("task_id", task.id).eq("user_id", context.userId).eq("idempotency_key", data.idempotencyKey).maybeSingle();
+    const admin: any = supabaseAdmin;
+    const { data: existing, error: findError } = await admin.from("project_sync_jobs").select("id,status,summary").eq("task_id", task.id).eq("user_id", context.userId).eq("idempotency_key", data.idempotencyKey).maybeSingle();
     if (findError) throw new Error("Could not check existing sync request.");
     if (existing) return { jobId: existing.id, status: existing.status, plan: existing.summary?.plan ?? plan, reused: true };
     const steps = plan.steps.filter((s) => s.state !== "not_applicable").map((s) => ({
@@ -60,7 +61,7 @@ export const createProjectSyncJob = createServerFn({ method: "POST" })
       task_id: task.id,
     }));
     const jobStatus = steps.some((s) => s.status === "waiting_approval") ? "waiting_approval" : "queued";
-    const { data: job, error: insertError } = await supabaseAdmin.from("project_sync_jobs").insert({
+    const { data: job, error: insertError } = await admin.from("project_sync_jobs").insert({
       task_id: task.id,
       user_id: context.userId,
       idempotency_key: data.idempotencyKey,
@@ -89,9 +90,9 @@ export const getProjectSyncJob = createServerFn({ method: "POST" })
   .inputValidator(z.object({ taskId: z.string().uuid(), jobId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     await ownedTask(context.supabase, context.userId, data.taskId);
-    const { data: job, error } = await context.supabase.from("project_sync_jobs").select("id,task_id,status,mode,source_commit_sha,summary,attempt,created_at,updated_at,finished_at").eq("id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).single();
+    const { data: job, error } = await (context.supabase as any).from("project_sync_jobs").select("id,task_id,status,mode,source_commit_sha,summary,attempt,created_at,updated_at,finished_at").eq("id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).single();
     if (error || !job) throw new Error("Sync job not found.");
-    const { data: steps, error: stepError } = await context.supabase.from("project_sync_steps").select("id,operation,status,depends_on,requires_approval,approved_at,attempt,error_code,error_summary,started_at,finished_at").eq("job_id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).order("created_at");
+    const { data: steps, error: stepError } = await (context.supabase as any).from("project_sync_steps").select("id,operation,status,depends_on,requires_approval,approved_at,attempt,error_code,error_summary,started_at,finished_at").eq("job_id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).order("created_at");
     if (stepError) throw new Error("Sync steps could not be loaded.");
     return { job, steps: steps ?? [] };
   });
@@ -106,6 +107,7 @@ export const approveProjectSyncStep = createServerFn({ method: "POST" })
     if (!step.requires_approval) throw new Error("This operation does not require approval.");
     if (step.status !== "waiting_approval" && step.status !== "pending") throw new Error("This operation is no longer awaiting approval.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const admin: any = supabaseAdmin;
     const now = new Date().toISOString();
     const { data: changed, error: updateError } = await supabaseAdmin.from("project_sync_steps").update({ approved_at: now, status: "pending", updated_at: now }).eq("id", step.id).eq("user_id", context.userId).is("approved_at", null).select("id");
     if (updateError) throw new Error("Approval could not be recorded.");
