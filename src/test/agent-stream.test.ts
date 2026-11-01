@@ -27,6 +27,7 @@ describe("agent event stream decoder", () => {
     expect(decoder.push(bytes.slice(0, splitInsideFirstCharacter))).toEqual([]);
     expect(decoder.push(bytes.slice(splitInsideFirstCharacter))).toEqual([{ t: "text", d: "世界" }]);
   });
+
   it("ignores blank lines and handles several events in one chunk", () => {
     const decoder = createAgentEventDecoder();
     expect(decoder.push(encode('\n{"t":"done"}\n\n{"t":"error","m":"failed"}\n'))).toEqual([
