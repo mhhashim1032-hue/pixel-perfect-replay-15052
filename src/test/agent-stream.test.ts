@@ -21,7 +21,7 @@ describe("agent event stream decoder", () => {
   });
 
   it("preserves UTF-8 characters split between byte chunks", () => {
-    const bytes = encode('{"t":"text","d":"世界"}\\n');
+    const bytes = encode('{"t":"text","d":"世界"}\n');
     const decoder = createAgentEventDecoder();
     const splitInsideFirstCharacter = encode('{"t":"text","d":"').length + 1;
     expect(decoder.push(bytes.slice(0, splitInsideFirstCharacter))).toEqual([]);
