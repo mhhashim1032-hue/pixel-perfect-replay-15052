@@ -183,6 +183,13 @@
       "when": 1793568000000,
       "tag": "0025_atomic_project_sync_claim",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793569000000,
+      "tag": "0026_project_sync_lease_fencing",
+      "breakpoints": true
     }
   ]
 }
