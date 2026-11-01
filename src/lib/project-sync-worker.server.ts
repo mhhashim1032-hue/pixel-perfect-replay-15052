@@ -23,16 +23,16 @@ async function finish(job: ClaimedJob, status: "failed" | "waiting_approval" | "
   if (error || data !== true) throw new Error("Sync worker lost its lease before completion.");
 }
 
-async function stepStatus(id: string, status: string, patch: Record<string, unknown> = {}) {
+async function stepStatus(userId: string, id: string, status: string, patch: Record<string, unknown> = {}) {
   const { error } = await db.from("project_sync_steps").update({
     status, updated_at: new Date().toISOString(), ...patch,
-  }).eq("id", id).eq("user_id", currentUserId);
+  }).eq("id", id).eq("user_id", userId);
   if (error) throw new Error("Could not persist sync step state.");
 }
 
 let currentUserId = "";
 
-async function runReadOnlyOperation(operation: string, task: any, tokens: Record<string, string>) {
+async function runReadOnlyOperation(operation: string, task: any, tokens: Partial<Record<"github" | "supabase" | "vercel", string>>) {
   if (operation === "inspect_repository") {
     const { GitHub } = await import("./github.server");
     const gh = new GitHub(tokens.github!);
@@ -79,16 +79,18 @@ export async function runProjectSyncWorker() {
     if (taskError || !task) throw new Error("Project ownership could not be verified.");
 
     const pins = cleanAccounts(job.account_bindings);
-    for (const provider of ["github", "supabase", "vercel"] as const) {
-      if (!pins[provider]) throw new Error(`The job is missing its pinned ${provider} account. Recreate the sync job after selecting accounts.`);
-    }
+    if (!pins.github) throw new Error("The job is missing its pinned GitHub account. Recreate the sync job after selecting accounts.");
+    if (task.supabase_ref && !pins.supabase) throw new Error("The job is missing its pinned Supabase account.");
+    if (task.vercel_project_id && !pins.vercel) throw new Error("The job is missing its pinned Vercel account.");
     const [github, supabase, vercel] = await Promise.all([
       accountToken(db, job.user_id, "github", pins),
-      accountToken(db, job.user_id, "supabase", pins),
-      accountToken(db, job.user_id, "vercel", pins),
+      task.supabase_ref ? accountToken(db, job.user_id, "supabase", pins) : Promise.resolve(null),
+      task.vercel_project_id ? accountToken(db, job.user_id, "vercel", pins) : Promise.resolve(null),
     ]);
-    if (!github || !supabase || !vercel) throw new Error("A pinned customer account is no longer connected. No alternate account was selected.");
-    const tokens = { github, supabase, vercel };
+    if (!github || task.supabase_ref && !supabase || task.vercel_project_id && !vercel) {
+      throw new Error("A pinned customer account is no longer connected. No alternate account was selected.");
+    }
+    const tokens = { github, supabase: supabase ?? undefined, vercel: vercel ?? undefined };
 
     const { data: steps, error: stepsError } = await db.from("project_sync_steps")
       .select("id,operation,status,depends_on,requires_approval,approved_at")
@@ -110,7 +112,7 @@ export async function runProjectSyncWorker() {
         outcomes.push({ operation: step.operation, status: step.status });
         continue;
       }
-      await stepStatus(step.id, "running", { started_at: new Date().toISOString(), attempt: (step.attempt ?? 0) + 1 });
+      await stepStatus(job.user_id, step.id, "running", { started_at: new Date().toISOString(), attempt: (step.attempt ?? 0) + 1 });
       try {
         const result = await runReadOnlyOperation(step.operation, task, tokens);
         await stepStatus(step.id, "succeeded", { safe_result: result, finished_at: new Date().toISOString(), error_code: null, error_summary: null });
