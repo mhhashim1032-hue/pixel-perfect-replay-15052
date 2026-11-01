@@ -49,7 +49,7 @@ export const createProjectSyncJob = createServerFn({ method: "POST" })
     if (!plan.canStart) throw new Error("Project is not ready to sync. Connect and pin the required customer accounts and resources first.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const admin: any = supabaseAdmin;
-    const { data: existing, error: findError } = await admin.from("project_sync_jobs").select("id,status,summary").eq("task_id", task.id).eq("user_id", context.userId).eq("idempotency_key", data.idempotencyKey).maybeSingle();
+    const { data: existing, error: findError } = await (admin as any).from("project_sync_jobs").select("id,status,summary").eq("task_id", task.id).eq("user_id", context.userId).eq("idempotency_key", data.idempotencyKey).maybeSingle();
     if (findError) throw new Error("Could not check existing sync request.");
     if (existing) return { jobId: existing.id, status: existing.status, plan: existing.summary?.plan ?? plan, reused: true };
     const steps = plan.steps.filter((s) => s.state !== "not_applicable").map((s) => ({
@@ -61,7 +61,7 @@ export const createProjectSyncJob = createServerFn({ method: "POST" })
       task_id: task.id,
     }));
     const jobStatus = steps.some((s) => s.status === "waiting_approval") ? "waiting_approval" : "queued";
-    const { data: job, error: insertError } = await admin.from("project_sync_jobs").insert({
+    const { data: job, error: insertError } = await (admin as any).from("project_sync_jobs").insert({
       task_id: task.id,
       user_id: context.userId,
       idempotency_key: data.idempotencyKey,
@@ -102,7 +102,7 @@ export const approveProjectSyncStep = createServerFn({ method: "POST" })
   .inputValidator(z.object({ taskId: z.string().uuid(), jobId: z.string().uuid(), operation: operationSchema }))
   .handler(async ({ data, context }) => {
     await ownedTask(context.supabase, context.userId, data.taskId);
-    const { data: step, error } = await context.supabase.from("project_sync_steps").select("id,status,requires_approval,approved_at").eq("job_id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).eq("operation", data.operation).single();
+    const { data: step, error } = await (context.supabase as any).from("project_sync_steps").select("id,status,requires_approval,approved_at").eq("job_id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).eq("operation", data.operation).single();
     if (error || !step) throw new Error("Approval request not found.");
     if (!step.requires_approval) throw new Error("This operation does not require approval.");
     if (step.status !== "waiting_approval" && step.status !== "pending") throw new Error("This operation is no longer awaiting approval.");
