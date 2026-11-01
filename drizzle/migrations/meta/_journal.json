@@ -169,6 +169,13 @@
       "when": 1793565906004,
       "tag": "0023_harden_task_interactions",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793567000000,
+      "tag": "0024_project_sync_ledger",
+      "breakpoints": true
     }
   ]
 }
