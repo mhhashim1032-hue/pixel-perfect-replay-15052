@@ -7,8 +7,11 @@ export function createAgentEventDecoder() {
 
   function parseLines(final: boolean): AgentEvent[] {
     const lines = buffer.split("\n");
+    // Keep the incomplete tail during streaming; at EOF, parse that final line too.
     buffer = final ? "" : lines.pop() ?? "";
-    return lines.filter((line) => line.trim().length > 0).map((line) => JSON.parse(line) as AgentEvent);
+    return lines
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line) as AgentEvent);
   }
 
   return {

@@ -250,6 +250,8 @@ function Workspace() {
       accepted = true;
       const reader = res.body.getReader();
       const decoder = createAgentEventDecoder();
+      let receivedDoneEvent = false;
+      let receivedErrorEvent = false;
       for (;;) {
         const { done, value } = await reader.read();
         const events = done ? decoder.finish() : decoder.push(value!);
@@ -272,6 +274,7 @@ function Workspace() {
           else if (e.t === "pending") setPending([...e.pending]);
           else if (e.t === "usage") setUsage({ input: ((session.data as { usage?: { input: number } } | undefined)?.usage?.input ?? 0) + e.input, output: ((session.data as { usage?: { output: number } } | undefined)?.usage?.output ?? 0) + e.output });
           else if (e.t === "error") {
+            receivedErrorEvent = true;
             setSendError(e.m);
             // The server reported a terminal run error even though the transport may close cleanly.
             // Offer the same safe continuation used for interrupted streams; never replay the prompt.
@@ -279,8 +282,16 @@ function Workspace() {
             patchLast((m) => ({ ...m, content: `${m.content}\n\n${e.m}` }));
             toast.error(e.m);
           }
+          if (e.t === "done") receivedDoneEvent = true;
         }
         if (done) break;
+      }
+      // A clean EOF is not proof the agent finished: the API emits an explicit done event.
+      if (!receivedDoneEvent && !receivedErrorEvent) {
+        const detail = "The agent stream ended before completion was confirmed. Your saved progress is preserved; continue from the latest state.";
+        setSendError(detail);
+        setStreamInterrupted(true);
+        toast.error("Agent connection ended before completion.");
       }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
