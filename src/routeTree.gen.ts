@@ -311,6 +311,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/jobs/resume-runs'
       preLoaderRoute: typeof ApiPublicJobsResumeRunsRouteImport
       parentRoute: typeof rootRouteImport
+    },
+    '/api/public/jobs/project-sync': {
+      id: '/api/public/jobs/project-sync'
+      path: '/api/public/jobs/project-sync'
+      fullPath: '/api/public/jobs/project-sync'
+      preLoaderRoute: typeof ApiPublicJobsProjectSyncRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
