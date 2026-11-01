@@ -144,6 +144,7 @@ function Workspace() {
   const capacity = promptCapacity(input);
   const [planMode, setPlanMode] = useState(false);
   const [usage, setUsage] = useState({ input: 0, output: 0 });
+  const sendLockRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const manualStopRef = useRef(false);
   const lastWasPlan = useRef(false);
@@ -193,7 +194,8 @@ function Workspace() {
 
   async function send(override?: string, forcePlan?: boolean) {
     let text = (override ?? input).trim();
-    if (!text || running || bgRunning) return;
+    // State updates render asynchronously; this ref closes the same-tick double-submit race.
+    if (!text || running || bgRunning || sendLockRef.current) return;
     manualStopRef.current = false;
     let plan = forcePlan ?? planMode;
     runStart.current = Date.now();
@@ -208,6 +210,7 @@ function Workspace() {
     }
     const validationError = promptError(text);
     if (validationError) { setSendError(validationError); return; }
+    sendLockRef.current = true;
     setSendError(null);
     setStreamInterrupted(false);
     const sentImages = images;
@@ -295,6 +298,7 @@ function Workspace() {
         }
       }
     } finally {
+      sendLockRef.current = false;
       setRunning(false);
       abortRef.current = null;
       if (!backgrounded && document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") new Notification("Forge", { body: "Your agent finished." });
