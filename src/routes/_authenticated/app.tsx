@@ -174,9 +174,12 @@ function Dashboard() {
                   </div>
                   {showNew ? (
                     <div className="space-y-2 rounded-md border bg-background p-3">
-                      <Input className="h-11 text-base sm:text-sm" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="my-new-project" />
-                      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={newPrivate} onChange={(e) => setNewPrivate(e.target.checked)} /> Private</label>
-                      <Button type="button" variant="secondary" size="sm" disabled={!newName.trim() || createRepoM.isPending} onClick={() => createRepoM.mutate()}>{createRepoM.isPending ? "Creating…" : "Create on GitHub"}</Button>
+                      <Input className="h-11 text-base sm:text-sm" value={newName} maxLength={100} onChange={(e) => setNewName(e.target.value.replace(/\s+/g, "-"))} placeholder="my-new-project" aria-label="New repository name" />
+                      <p className="text-xs text-muted-foreground">Use letters, numbers, dots, hyphens or underscores.</p>
+                      <Input className="h-10 text-sm" value={newDesc} maxLength={350} onChange={(e) => setNewDesc(e.target.value)} placeholder="Description (optional)" aria-label="Repository description" />
+                      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={newPrivate} onChange={(e) => setNewPrivate(e.target.checked)} /> Private repository</label>
+                      {createRepoM.error && <p role="alert" className="text-xs text-destructive">{(createRepoM.error as Error).message}</p>}
+                      <Button type="button" variant="secondary" size="sm" disabled={!/^[A-Za-z0-9._-]{1,100}$/.test(newName.trim()) || createRepoM.isPending} onClick={() => createRepoM.mutate()}>{createRepoM.isPending ? "Creating…" : "Create on GitHub"}</Button>
                     </div>
                   ) : (
                     <Select value={repo} onValueChange={setRepo}>
@@ -184,7 +187,9 @@ function Dashboard() {
                       <SelectContent className="max-w-[calc(100vw-2rem)]">{repos.data?.map((r) => <SelectItem key={r.full_name} value={r.full_name}>{r.full_name}</SelectItem>)}</SelectContent>
                     </Select>
                   )}
-                  {repos.error && <p className="text-xs text-destructive">{(repos.error as Error).message}</p>}
+                  {repos.error && <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive"><span className="min-w-0 flex-1">{(repos.error as Error).message}</span><Button type="button" size="sm" variant="outline" onClick={() => void repos.refetch()} disabled={repos.isFetching}>Retry</Button></div>}
+                  {!showNew && repos.data?.length === 0 && !repos.isLoading && !repos.error && <p className="text-xs text-muted-foreground">No repositories found. Create a project above or check GitHub account access.</p>}
+                  {repo && branches.error && <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-destructive"><span className="min-w-0 flex-1">Branches could not be loaded: {(branches.error as Error).message}</span><Button type="button" size="sm" variant="outline" onClick={() => void branches.refetch()} disabled={branches.isFetching}>Retry</Button></div>}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Using <span className="text-foreground">{aiCreds.find((c) => c.id === credId)?.label ?? "your AI key"}</span> · <span className="font-mono text-foreground">{manualModel || model || "…"}</span> · {AUTONOMY_LABEL[mode].title}{" "}
@@ -201,6 +206,7 @@ function Dashboard() {
                         </Select>
                       </div>
                     )}
+                    {models.error && <div role="alert" className="rounded-md border border-destructive/40 p-2 text-xs text-destructive">Could not load models for this AI key. Retry or enter a compatible model ID manually below. <Button type="button" size="sm" variant="outline" className="ml-2" onClick={() => void models.refetch()} disabled={models.isFetching}>Retry</Button></div>}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-1.5">
                         <Label>AI key</Label>
@@ -230,9 +236,11 @@ function Dashboard() {
                   </div>
                 )}
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={setupConnections} onChange={(e) => setSetupConnections(e.target.checked)} /> Connect database & website first</label>
-                <Button disabled={!repo || !branch || !credId || !(model || manualModel) || createM.isPending || !!setupId} className="h-12 w-full text-base">
-                  <Plus /> {createM.isPending ? "Starting…" : "Start building"}
+                {createM.error && <p role="alert" className="text-sm text-destructive">{(createM.error as Error).message}</p>}
+                <Button disabled={!repo || !branch || !credId || !(model || manualModel) || !goal.trim() || createM.isPending || !!setupId} className="h-12 w-full text-base">
+                  <Plus /> {createM.isPending ? "Creating your workspace…" : "Start building"}
                 </Button>
+                {!goal.trim() && <p className="text-center text-xs text-muted-foreground">Describe what you want to build to start a task.</p>}
               </form>
             )}
           </div>
