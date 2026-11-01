@@ -72,14 +72,14 @@ export const createProjectSyncJob = createServerFn({ method: "POST" })
     }).select("id,status").single();
     if (insertError || !job) {
       // A concurrent identical request may have won the unique constraint.
-      const { data: raced } = await supabaseAdmin.from("project_sync_jobs").select("id,status,summary").eq("task_id", task.id).eq("user_id", context.userId).eq("idempotency_key", data.idempotencyKey).maybeSingle();
+      const { data: raced } = await (admin as any).from("project_sync_jobs").select("id,status,summary").eq("task_id", task.id).eq("user_id", context.userId).eq("idempotency_key", data.idempotencyKey).maybeSingle();
       if (raced) return { jobId: raced.id, status: raced.status, plan: raced.summary?.plan ?? plan, reused: true };
       throw new Error("Could not create project sync job.");
     }
     const rows = steps.map((s) => ({ ...s, job_id: job.id }));
-    const { error: stepError } = await supabaseAdmin.from("project_sync_steps").insert(rows);
+    const { error: stepError } = await (admin as any).from("project_sync_steps").insert(rows);
     if (stepError) {
-      await supabaseAdmin.from("project_sync_jobs").update({ status: "failed", finished_at: new Date().toISOString(), summary: { plan, error: "step_initialization_failed" } }).eq("id", job.id).eq("user_id", context.userId);
+      await (admin as any).from("project_sync_jobs").update({ status: "failed", finished_at: new Date().toISOString(), summary: { plan, error: "step_initialization_failed" } }).eq("id", job.id).eq("user_id", context.userId);
       throw new Error("Sync job was recorded but its steps could not be initialized. It has been marked failed.");
     }
     return { jobId: job.id, status: job.status, plan, reused: false };
@@ -109,10 +109,10 @@ export const approveProjectSyncStep = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const admin: any = supabaseAdmin;
     const now = new Date().toISOString();
-    const { data: changed, error: updateError } = await supabaseAdmin.from("project_sync_steps").update({ approved_at: now, status: "pending", updated_at: now }).eq("id", step.id).eq("user_id", context.userId).is("approved_at", null).select("id");
+    const { data: changed, error: updateError } = await (admin as any).from("project_sync_steps").update({ approved_at: now, status: "pending", updated_at: now }).eq("id", step.id).eq("user_id", context.userId).is("approved_at", null).select("id");
     if (updateError) throw new Error("Approval could not be recorded.");
     if (!changed?.length && !step.approved_at) throw new Error("Approval state changed; refresh the project sync.");
-    const { error: jobError } = await supabaseAdmin.from("project_sync_jobs").update({ status: "queued", updated_at: now }).eq("id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).eq("status", "waiting_approval");
+    const { error: jobError } = await (admin as any).from("project_sync_jobs").update({ status: "queued", updated_at: now }).eq("id", data.jobId).eq("task_id", data.taskId).eq("user_id", context.userId).eq("status", "waiting_approval");
     if (jobError) throw new Error("Approval was recorded, but the sync job could not be queued.");
     return { approved: true, queued: true };
   });
