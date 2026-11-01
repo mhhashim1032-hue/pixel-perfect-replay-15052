@@ -31,6 +31,7 @@ import { ATTACH_ACCEPT, MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, attachmentType } 
 import { SharedFiles } from "@/components/SharedFiles";
 import { DatabaseApproval } from "@/components/DatabaseApproval";
 import { TaskInteractions } from "@/components/TaskInteractions";
+import { createAgentEventDecoder } from "@/lib/agent-stream";
 
 export const Route = createFileRoute("/_authenticated/s/$id")({
   head: () => ({ meta: pageMeta("Task — Forge", "Review your coding agent's conversation, files and proposed changes.") }),
@@ -245,22 +246,11 @@ function Workspace() {
       if (!res.ok || !res.body) throw new Error(await res.text());
       accepted = true;
       const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
+      const decoder = createAgentEventDecoder();
       for (;;) {
         const { done, value } = await reader.read();
-        // Flush the decoder and process a final JSON event even without a trailing newline.
-        if (done) {
-          buf += dec.decode();
-          if (buf.trim()) buf += "\n";
-        } else {
-          buf += dec.decode(value, { stream: true });
-        }
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line) continue;
-          const e = JSON.parse(line) as AgentEvent;
+        const events = done ? decoder.finish() : decoder.push(value!);
+        for (const e of events) {
           if (e.t === "text") patchLast((m) => ({ ...m, content: m.content + e.d }));
           else if (e.t === "tool")
             patchLast((m) => ({
