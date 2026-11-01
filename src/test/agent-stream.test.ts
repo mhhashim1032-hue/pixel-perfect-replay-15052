@@ -21,12 +21,12 @@ describe("agent event stream decoder", () => {
   });
 
   it("preserves UTF-8 characters split between byte chunks", () => {
-    const bytes = encode('{"t":"text","d":"世界"}\n');
+    const bytes = encode('{"t":"text","d":"世界"}\\n');
     const decoder = createAgentEventDecoder();
-    expect(decoder.push(bytes.slice(0, bytes.length - 3))).toEqual([]);
-    expect(decoder.push(bytes.slice(bytes.length - 3))).toEqual([{ t: "text", d: "世界" }]);
+    const splitInsideFirstCharacter = encode('{"t":"text","d":"').length + 1;
+    expect(decoder.push(bytes.slice(0, splitInsideFirstCharacter))).toEqual([]);
+    expect(decoder.push(bytes.slice(splitInsideFirstCharacter))).toEqual([{ t: "text", d: "世界" }]);
   });
-
   it("ignores blank lines and handles several events in one chunk", () => {
     const decoder = createAgentEventDecoder();
     expect(decoder.push(encode('\n{"t":"done"}\n\n{"t":"error","m":"failed"}\n'))).toEqual([
