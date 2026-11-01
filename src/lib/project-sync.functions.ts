@@ -105,6 +105,7 @@ export const approveProjectSyncStep = createServerFn({ method: "POST" })
     if (error || !step) throw new Error("Approval request not found.");
     if (!step.requires_approval) throw new Error("This operation does not require approval.");
     if (step.status !== "waiting_approval" && step.status !== "pending") throw new Error("This operation is no longer awaiting approval.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const now = new Date().toISOString();
     const { data: changed, error: updateError } = await supabaseAdmin.from("project_sync_steps").update({ approved_at: now, status: "pending", updated_at: now }).eq("id", step.id).eq("user_id", context.userId).is("approved_at", null).select("id");
     if (updateError) throw new Error("Approval could not be recorded.");
