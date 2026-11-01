@@ -35,7 +35,10 @@ export const ROLE_BRIEF: Record<SpecialistRole, string> = {
  */
 export function scheduleWaves(jobs: { label: string; after?: string[] }[]): number[][] | string {
   const index = new Map<string, number>();
-  jobs.forEach((j, i) => { if (!index.has(j.label)) index.set(j.label, i); });
+  jobs.forEach((j, i) => {
+    if (index.has(j.label)) throw new Error(`Duplicate job label "${j.label}". Labels must be unique after normalization.`);
+    index.set(j.label, i);
+  });
   for (const j of jobs) for (const d of j.after ?? []) {
     if (!index.has(d)) return `Job "${j.label}" waits for unknown job "${d}".`;
     if (d === j.label) return `Job "${j.label}" cannot wait for itself.`;
@@ -76,13 +79,21 @@ export function ownsPath(paths: string[], path: string): boolean {
 export async function parallelMap<T, R>(items: T[], limit: number, run: (item: T, index: number) => Promise<R>, signal?: AbortSignal): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let cursor = 0;
+  let failed = false;
   await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, async () => {
-    while (cursor < items.length) {
+    while (!failed && cursor < items.length) {
       signal?.throwIfAborted();
       const index = cursor++;
       const item = items[index];
       if (item === undefined) continue;
-      results[index] = await run(item, index);
+      try {
+        results[index] = await run(item, index);
+      } catch (error) {
+        // Stop assigning queued work as soon as any worker fails. Other in-flight work
+        // is allowed to settle; callers still receive the original failure.
+        failed = true;
+        throw error;
+      }
     }
   }));
   return results;
