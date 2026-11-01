@@ -249,8 +249,13 @@ function Workspace() {
       let buf = "";
       for (;;) {
         const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
+        // Flush the decoder and process a final JSON event even without a trailing newline.
+        if (done) {
+          buf += dec.decode();
+          if (buf.trim()) buf += "\n";
+        } else {
+          buf += dec.decode(value, { stream: true });
+        }
         const lines = buf.split("\n");
         buf = lines.pop() ?? "";
         for (const line of lines) {
@@ -279,6 +284,7 @@ function Workspace() {
             toast.error(e.m);
           }
         }
+        if (done) break;
       }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
