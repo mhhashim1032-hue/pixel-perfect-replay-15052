@@ -39,9 +39,9 @@ type SyncEventRow = {
 export function safeProjectSyncHistoryError(value: unknown): string | null {
   if (typeof value !== "string") return null;
   return value
-    .replace(/Bearer\\s+[^\\s"'<>]+/gi, "Bearer [REDACTED]")
-    .replace(/(?:sk|pk|sb_secret|sb_publishable)_[A-Za-z0-9_-]{8,}/g, "[REDACTED_KEY]")
-    .replace(/(access_token|refresh_token|api_key|apikey|password|secret)=([^&\\s]+)/gi, "$1=[REDACTED]")
+    .replace(/\bBearer\s+[^\s"'<>]+/gi, "Bearer [REDACTED]")
+    .replace(/\b(?:sk|pk|sb_secret|sb_publishable)_[A-Za-z0-9_-]{8,}\b/g, "[REDACTED_KEY]")
+    .replace(/\b(access_token|refresh_token|api_key|apikey|password|secret)\s*=\s*([^&\s]+)/gi, "$1=[REDACTED]")
     .slice(0, 300);
 }
 
