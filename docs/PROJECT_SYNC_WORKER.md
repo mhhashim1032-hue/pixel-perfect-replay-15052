@@ -26,3 +26,12 @@ The authenticated `startProjectSyncInspection` server function now creates an id
 The launcher emits only the implemented read-only operations: GitHub repository inspection, optional Supabase project status verification, and optional Vercel project/repository binding verification. Vercel verification depends on GitHub inspection. Missing optional Supabase/Vercel account pins omit those steps rather than silently selecting a different credential. The worker independently re-checks that every operation still has its exact provider pin before resolving a credential. The plan binding includes the task's resource pins, selected credential IDs and session revision; a reused request UUID with a changed plan is rejected by the ledger's idempotency binding.
 
 This endpoint creates a queued ledger record only. It does not invoke the worker, schedule background execution, or write to customer infrastructure. A secured worker trigger, run-history UI, and explicit approval paths remain future work. The internal ledger migration still requires validation against a disposable internal PostgreSQL database before production use; it has not been applied here.
+
+
+## Secret-protected worker trigger
+
+A bounded `POST /api/project-sync-worker` endpoint is now implemented for internal automation. It requires `Authorization: Bearer <secret>` where `FORGE_SYNC_WORKER_SECRET` is a high-entropy URL-safe secret of at least 32 characters. Comparison is constant-time. The request body accepts only a UUID `runId`; provider URLs, operations, account IDs, step payloads and credentials are never accepted from the caller.
+
+Each invocation processes at most three ready steps with 90-second fenced leases and propagates request cancellation. The executor still permits only the three read-only provider inspections; all customer writes remain disabled. Missing or weak secrets fail closed. The secret must be configured only in a trusted server/worker environment and must never be exposed to browser code.
+
+This endpoint is not scheduled or deployed by this change. It remains unusable until Forge's dedicated internal ledger URL, service-role key, worker secret and internal migration are configured. Do not point the internal ledger variables at a customer Supabase project. No VM, scheduler, secret or database has been provisioned or modified.
