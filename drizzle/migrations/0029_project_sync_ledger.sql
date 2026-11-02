@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS public.project_sync_steps (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (run_id, step_key),
-  CHECK ((state = 'leased') = (lease_token IS NOT NULL AND lease_expires_at IS NOT NULL))
+  CHECK ((state = 'leased' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL) OR (state <> 'leased' AND lease_token IS NULL AND lease_expires_at IS NULL))
 );
 CREATE INDEX IF NOT EXISTS project_sync_steps_claim
   ON public.project_sync_steps(state, next_retry_at, lease_expires_at, created_at);
