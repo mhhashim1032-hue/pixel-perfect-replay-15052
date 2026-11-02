@@ -38,7 +38,13 @@ describe("pinned GitHub inspection adapter", () => {
     expect(result.outputFingerprint).toHaveLength(64);
   });
 
-  it("passes worker cancellation through to the GitHub API client", async () => {\n    const controller = new AbortController();\n    await inspectPinnedGitHubRepository({ supabase: {}, userId: "user-1", session, signal: controller.signal });\n    expect(mocks.signal).toBe(controller.signal);\n  });\n\n  it("rejects a session owned by another user before resolving credentials", async () => {
+  it("passes worker cancellation through to the GitHub API client", async () => {
+    const controller = new AbortController();
+    await inspectPinnedGitHubRepository({ supabase: {}, userId: "user-1", session, signal: controller.signal });
+    expect(mocks.signal).toBe(controller.signal);
+  });
+
+  it("rejects a session owned by another user before resolving credentials", async () => {
     await expect(inspectPinnedGitHubRepository({ supabase: {}, userId: "user-2", session }))
       .rejects.toThrow("not owned");
     expect(accountToken).not.toHaveBeenCalled();
