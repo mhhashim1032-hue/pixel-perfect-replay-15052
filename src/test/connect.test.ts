@@ -22,10 +22,10 @@ describe("connect & sync rules", () => {
   it("prefers the registered Vercel production alias over custom domains", () => {
     expect(orderDomains(["my-app-x1.vercel.app", "my-app.vercel.app", "shop.com"])).toEqual(["my-app.vercel.app", "my-app-x1.vercel.app", "shop.com"]);
   });
-  it("disables customer email confirmation with a narrow patch and preserves existing return links", () => {
+  it("preserves customer email confirmation and existing return links", () => {
     const cfg = { mailer_autoconfirm: false, uri_allow_list: "https://old.com/**", site_url: "https://old.com", disable_signup: true, password_hibp_enabled: true };
     const patch = customerAuthPatch(cfg, ["app.vercel.app"]);
-    expect(patch.mailer_autoconfirm).toBe(true);
+    expect(patch).not.toHaveProperty("mailer_autoconfirm");
     expect(patch.site_url).toBe("https://app.vercel.app");
     expect(patch.uri_allow_list).toContain("https://old.com/**");
     expect(patch).not.toHaveProperty("disable_signup");
