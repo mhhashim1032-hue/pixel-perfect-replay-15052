@@ -52,18 +52,23 @@ jobs:
           bun-version: latest
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
-      - name: Validate cloud bootstrap and Oracle keeper syntax
+      - name: Validate cloud bootstrap, keeper and training scripts
         run: |
           bash -n ops/free-cloud/oci-bootstrap.sh
           bash -n ops/oci-keeper/install.sh
           node --check ops/oci-keeper/server.mjs
           node --test ops/oci-keeper/server.test.mjs
+          python3 -m py_compile ops/training/prepare_dataset.py ops/training/finetune_lora.py ops/training/test_prepare_dataset.py
+      - name: Test consent-gated training dataset preparation
+        run: python3 -m unittest discover -s ops/training -p 'test_*.py'
       - name: Typecheck
         run: bunx tsc --noEmit
       - name: Lint changed TypeScript and JavaScript files
         shell: bash
         run: |
-          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts src/lib/project-sync-github-adapter.server.ts src/lib/project-sync-executor.server.ts src/lib/project-sync-launch.server.ts src/lib/project-sync-history.server.ts src/lib/project-sync-supabase-adapter.server.ts src/lib/project-sync-vercel-adapter.server.ts src/lib/project-sync-worker-auth.server.ts src/lib/project-sync-dispatcher.server.ts src/lib/remote-keeper.server.ts src/components/ProjectSyncHistory.tsx src/components/ProjectHealth.tsx src/routes/api/agent-background.ts src/routes/api/public/jobs/resume-runs.ts src/test/remote-keeper.test.ts src/test/project-sync-github-adapter.test.ts src/test/project-sync-executor.test.ts src/test/project-sync-launch.test.ts src/test/project-sync-history.test.ts src/test/project-sync-supabase-adapter.test.ts src/test/project-sync-vercel-adapter.test.ts src/test/project-sync-worker-auth.test.ts
+          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts src/lib/project-sync-github-adapter.server.ts src/lib/project-sync-executor.server.ts src/lib/project-sync-launch.server.ts src/lib/project-sync-history.server.ts src/lib/project-sync-supabase-adapter.server.ts src/lib/project-sync-vercel-adapter.server.ts src/lib/engine/evaluation.ts src/lib/engine/errors.ts src/lib/project-sync-worker-auth.server.ts src/lib/project-sync-dispatcher.server.ts src/lib/remote-keeper.server.ts src/components/ProjectSyncHistory.tsx src/components/ProjectHealth.tsx src/test/engine-evaluation.test.ts src/test/engine-errors.test.ts scripts/evaluate-uaf.ts src/routes/api/agent-background.ts src/routes/api/public/jobs/resume-runs.ts src/test/remote-keeper.test.ts src/test/project-sync-github-adapter.test.ts src/test/project-sync-executor.test.ts src/test/project-sync-launch.test.ts src/test/project-sync-history.test.ts src/test/project-sync-supabase-adapter.test.ts src/test/project-sync-vercel-adapter.test.ts src/test/project-sync-worker-auth.test.ts
+      - name: Validate UAF evaluation catalog and scoring CLI
+        run: bun run eval:uaf
       - name: Execute project sync ledger migration on disposable PostgreSQL
         env:
           PGHOST: 127.0.0.1

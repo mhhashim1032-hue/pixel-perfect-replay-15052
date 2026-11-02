@@ -18,8 +18,11 @@ const RULES: [ErrorCategory, RegExp, boolean][] = [
 export function redact(text: string, max = 500): string {
   return text
     .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, "[redacted-jwt]")
-    .replace(/\b(sk|pk|rk|sb|ghp|gho|github_pat|xox[abp])[-_][\w-]{8,}/gi, "[redacted-key]")
+    .replace(/\b(sk|pk|rk|sb|ghp|gho|ghu|ghs|ghr|github_pat|xox[abp]|glpat|hf|npm|pypi)[-_][\w-]{8,}/gi, "[redacted-key]")
+    .replace(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, "[redacted-aws-key]")
+    .replace(/\bAIza[0-9A-Za-z_-]{30,}\b/g, "[redacted-google-key]")
     .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, "$1[redacted]@")
+    .replace(/\bBearer\s+[^\s"'<>]{8,}/gi, "Bearer [redacted]")
     .replace(/((?:api[_-]?key|token|secret|password|authorization)["'\s:=]+)[^\s"',]{6,}/gi, "$1[redacted]")
     .replace(/\s+/g, " ")
     .trim()
