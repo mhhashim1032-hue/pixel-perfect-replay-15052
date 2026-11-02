@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LedgerStepLease } from "./project-sync-ledger.server";
 import { accountRow } from "./accounts.server";
+import { cleanAccounts } from "./accounts";
 import { fingerprintProjectSyncPlan } from "./project-sync-ledger.server";
 import { inspectPinnedGitHubRepository } from "./project-sync-github-adapter.server";
 import { inspectPinnedSupabaseProject } from "./project-sync-supabase-adapter.server";
@@ -110,8 +111,12 @@ export function createProjectSyncExecutor(internalAdmin: SupabaseClient): Projec
     const { owner, session } = await loadOwnedRunContext(internalAdmin, step.run_id);
     if (session.user_id !== owner.user_id) throw new Error("Project session ownership verification failed.");
 
+    const pins = cleanAccounts(session.accounts);
     if (step.operation === "inspect_repository") {
-      const githubAccount = await accountRow(internalAdmin, owner.user_id, "github", session.accounts);
+      if (!Object.prototype.hasOwnProperty.call(pins, "github") || !pins.github) {
+        return { state: "failed", safeError: "Select and pin a GitHub account to this task." };
+      }
+      const githubAccount = await accountRow(internalAdmin, owner.user_id, "github", pins);
       if (!githubAccount) return { state: "failed", safeError: "Connect the GitHub account pinned to this project." };
       const expectedFingerprint = githubInspectionInputFingerprint({
         userId: owner.user_id,
@@ -128,7 +133,10 @@ export function createProjectSyncExecutor(internalAdmin: SupabaseClient): Projec
     }
 
     if (step.operation === "verify_database_binding") {
-      const supabaseAccount = await accountRow(internalAdmin, owner.user_id, "supabase", session.accounts);
+      if (!Object.prototype.hasOwnProperty.call(pins, "supabase") || !pins.supabase) {
+        return { state: "failed", safeError: "Select and pin a Supabase account to this task." };
+      }
+      const supabaseAccount = await accountRow(internalAdmin, owner.user_id, "supabase", pins);
       if (!supabaseAccount) return { state: "failed", safeError: "Connect the Supabase account pinned to this project." };
       const expectedFingerprint = supabaseBindingInputFingerprint({
         userId: owner.user_id,
@@ -143,7 +151,10 @@ export function createProjectSyncExecutor(internalAdmin: SupabaseClient): Projec
       return { state: "succeeded", outputFingerprint: result.outputFingerprint };
     }
 
-    const vercelAccount = await accountRow(internalAdmin, owner.user_id, "vercel", session.accounts);
+    if (!Object.prototype.hasOwnProperty.call(pins, "vercel") || !pins.vercel) {
+      return { state: "failed", safeError: "Select and pin a Vercel account to this task." };
+    }
+    const vercelAccount = await accountRow(internalAdmin, owner.user_id, "vercel", pins);
     if (!vercelAccount) return { state: "failed", safeError: "Connect the Vercel account pinned to this project." };
     const expectedVercelFingerprint = vercelBindingInputFingerprint({
       userId: owner.user_id,
