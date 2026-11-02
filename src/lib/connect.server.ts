@@ -47,7 +47,7 @@ export async function syncProject(sb: any, s: Session, opts: { applyMigrations?:
   if (!s.supabase_ref) steps.push({ key: "database", label: "Database", state: "skip", note: st ? "Choose a database in Deploy" : "Not connected" });
   else if (!st) steps.push({ key: "database", label: "Database", state: "fail", note: "Database account missing; reconnect it" });
   else if (s.vercel_project_id && vt && !opts.allowSettingsWrites) {
-    steps.push({ key: "database", label: "Database settings in Vercel", state: "warn", note: "Customer settings were inspected only. Review and explicitly approve environment changes in Deploy before syncing." });
+    steps.push({ key: "database", label: "Database settings in Vercel", state: "warn", note: "Customer environment values were not changed. Review and explicitly approve environment changes in Deploy before syncing." });
   } else if (s.vercel_project_id && vt) {
     try {
       const { syncTaskDatabase } = await import("./deployment-settings.server");
@@ -61,7 +61,7 @@ export async function syncProject(sb: any, s: Session, opts: { applyMigrations?:
 
   // Auth settings can change signup confirmation, site URL and allowed redirects. Never mutate them from a broad sync.
   if (s.supabase_ref && st && !opts.allowSettingsWrites) {
-    steps.push({ key: "auth", label: "Signup and sign-in settings", state: "warn", note: "Authentication settings were not changed. Review the proposed redirect and confirmation changes in Deploy." });
+    steps.push({ key: "auth", label: "Signup and sign-in settings", state: "warn", note: "Authentication settings were not changed. Review any proposed redirect allow-list changes in Deploy; email confirmation settings are preserved." });
   } else if (s.supabase_ref && st) {
     try {
       const { syncCustomerAuth } = await import("./customer-auth.server");
