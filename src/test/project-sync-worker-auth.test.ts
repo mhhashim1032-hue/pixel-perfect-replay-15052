@@ -14,6 +14,7 @@ describe("project sync worker trigger authentication", () => {
   it("fails closed when the configured secret is absent, weak or malformed", () => {
     expect(isValidProjectSyncWorkerSecret(`Bearer ${secret}`, undefined)).toBe(false);
     expect(isValidProjectSyncWorkerSecret("Bearer short", "short")).toBe(false);
+    expect(isValidProjectSyncWorkerSecret(`Bearer ${"界".repeat(32)}`, secret)).toBe(false);
     expect(isValidProjectSyncWorkerSecret(`Bearer ${secret}`, "has spaces and is long enough")).toBe(false);
   });
 });
