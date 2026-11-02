@@ -129,3 +129,12 @@ export async function finalizeProjectSyncRun(internalAdmin: SupabaseClient, runI
   const { data, error } = await internalAdmin.rpc("project_sync_finalize_run", { _run: runId });
   return assertRpc(data as string, error);
 }
+
+/** Releases exactly one approval-gated step; stale or mismatched bindings return false. */
+export async function approveProjectSyncStep(internalAdmin: SupabaseClient, stepId: string, approvalBinding: string): Promise<boolean> {
+  const { data, error } = await internalAdmin.rpc("project_sync_approve_step", {
+    _step: stepId,
+    _approval_binding: approvalBinding,
+  });
+  return assertRpc(Boolean(data), error);
+}
