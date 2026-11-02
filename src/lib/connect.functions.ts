@@ -71,3 +71,24 @@ export const startProjectSyncInspection = createServerFn({ method: "POST" })
       idempotencyKey: data.requestId,
     });
   });
+
+/**
+ * Returns only the signed-in owner's sync history for the requested task.
+ * Run/step/event reads are scoped again in the internal ledger query.
+ */
+export const getProjectSyncHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ id: z.string().uuid(), page: z.number().int().min(0).max(10_000).optional() }))
+  .handler(async ({ data, context }) => {
+    const [{ getInternalLedgerAdmin }, { readOwnedProjectSyncHistory }] = await Promise.all([
+      import("./internal-ledger-client.server"),
+      import("./project-sync-history.server"),
+    ]);
+    return readOwnedProjectSyncHistory({
+      userSupabase: context.supabase,
+      internalAdmin: getInternalLedgerAdmin(),
+      userId: context.userId,
+      sessionId: data.id,
+      page: data.page,
+    });
+  });
