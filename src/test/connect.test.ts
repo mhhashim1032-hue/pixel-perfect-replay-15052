@@ -44,5 +44,8 @@ describe("connect & sync rules", () => {
     expect(prompt).toContain("without changing customer infrastructure");
     expect(prompt).toContain("never write customer environment/auth settings");
     expect(prompt).toContain("migrations remain pending explicit review and approval");
+    expect(prompt).toContain("Do not promote to production");
+    expect(prompt).toContain("never to trigger production deployment");
+    expect(prompt).toContain("do not change customer Supabase Auth settings");
   });
 });
