@@ -310,3 +310,29 @@ REVOKE ALL ON FUNCTION public.project_sync_finalize_run(uuid) FROM PUBLIC, anon,
 GRANT EXECUTE ON FUNCTION public.project_sync_create_run(uuid, uuid, text, text, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.project_sync_renew_step(uuid, uuid, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.project_sync_finalize_run(uuid) TO service_role;
+
+-- Explicitly release an approval-gated step only when the caller supplies the exact
+-- approval binding captured for that step. Approval is not inherited across steps.
+CREATE OR REPLACE FUNCTION public.project_sync_approve_step(_step uuid, _approval_binding text) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE affected_run uuid;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+  IF length(coalesce(_approval_binding,'')) < 8 OR length(_approval_binding) > 512 THEN
+    RAISE EXCEPTION 'invalid approval binding' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.project_sync_steps
+    SET state = 'queued', updated_at = now()
+    WHERE id = _step AND state = 'approval_required' AND approval_binding = _approval_binding
+    RETURNING run_id INTO affected_run;
+  IF NOT FOUND THEN RETURN false; END IF;
+  UPDATE public.project_sync_runs SET status = 'queued', finished_at = NULL, updated_at = now()
+    WHERE id = affected_run AND status = 'partial';
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.project_sync_approve_step(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.project_sync_approve_step(uuid, text) TO service_role;
