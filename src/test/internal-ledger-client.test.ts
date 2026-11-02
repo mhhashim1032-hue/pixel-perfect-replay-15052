@@ -19,10 +19,15 @@ describe("Forge internal ledger credentials", () => {
     });
   });
 
-  it("rejects publishable keys and insecure remote URLs", () => {
+  it("rejects publishable keys, anon JWTs and insecure remote URLs", () => {
     expect(() => resolveInternalLedgerConfig({
       FORGE_INTERNAL_SUPABASE_URL: "https://forge-internal.supabase.co",
       FORGE_INTERNAL_SUPABASE_SERVICE_ROLE_KEY: "sb_publishable_public",
+    })).toThrow("server-only service-role");
+    const anonPayload = btoa(JSON.stringify({ role: "anon" })).replace(/=/g, "");
+    expect(() => resolveInternalLedgerConfig({
+      FORGE_INTERNAL_SUPABASE_URL: "https://forge-internal.supabase.co",
+      FORGE_INTERNAL_SUPABASE_SERVICE_ROLE_KEY: `e30.${anonPayload}.signature`,
     })).toThrow("server-only service-role");
     expect(() => resolveInternalLedgerConfig({
       FORGE_INTERNAL_SUPABASE_URL: "http://forge-internal.example.com",
