@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { githubInspectionInputFingerprint, createProjectSyncExecutor } from "@/lib/project-sync-executor.server";
+import { githubInspectionInputFingerprint, supabaseBindingInputFingerprint, createProjectSyncExecutor } from "@/lib/project-sync-executor.server";
 
 describe("project sync executor allowlist", () => {
   it("binds GitHub inspection to the exact user, session, repository, branch and credential", () => {
@@ -12,7 +12,7 @@ describe("project sync executor allowlist", () => {
     expect(githubInspectionInputFingerprint({ ...input, userId: "user-2" })).not.toBe(fingerprint);
   });
 
-  it("rejects every provider operation except the explicitly implemented GitHub inspection", async () => {
+  it("binds Supabase verification to the exact project and credential", () => {\n    const input = { userId: "user-1", sessionId: "session-1", projectRef: "abcdefghijklmnopqrst", credentialId: "supabase-account-1" };\n    const fingerprint = supabaseBindingInputFingerprint(input);\n    expect(fingerprint).toHaveLength(64);\n    expect(supabaseBindingInputFingerprint(input)).toBe(fingerprint);\n    expect(supabaseBindingInputFingerprint({ ...input, projectRef: "zyxwvutsrqponmlkjihgf" })).not.toBe(fingerprint);\n    expect(supabaseBindingInputFingerprint({ ...input, credentialId: "supabase-account-2" })).not.toBe(fingerprint);\n  });\n\n  it("rejects every provider operation except the explicitly implemented GitHub inspection", async () => {
     const executor = createProjectSyncExecutor({} as never);
     const result = await executor({
       id: "step-1",
