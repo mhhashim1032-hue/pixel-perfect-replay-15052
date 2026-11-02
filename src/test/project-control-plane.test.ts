@@ -26,7 +26,8 @@ describe("customer project control-plane planning", () => {
       "sync_environment", "sync_auth_redirects", "inspect_migrations",
       "apply_migrations", "deploy_exact_commit", "verify_runtime",
     ]);
-    expect(plan.requiresApproval).toEqual(["apply_migrations"]);\n    expect(plan.steps.find((step) => step.operation === "deploy_exact_commit")?.state).toBe("blocked");
+    expect(plan.requiresApproval).toEqual(["apply_migrations"]);
+    expect(plan.steps.find((step) => step.operation === "deploy_exact_commit")?.state).toBe("blocked");
     expect(plan.steps.find((step) => step.operation === "apply_migrations")?.state).toBe("approval_required");
   });
 
