@@ -56,7 +56,7 @@ describe("durable project sync worker", () => {
     expect(result.stepState).toBe("retryable");
     const finish = db.rpc.mock.calls.find(([name]) => name === "project_sync_finish_step");
     expect(finish?.[1]).toMatchObject({ _state: "retryable", _safe_error: "temporary provider timeout" });
-    expect(finish?.[1]._retry_at).toBeTruthy();
+    expect(finish?.[1]?.["_retry_at"]).toBeTruthy();
   });
 
   it("does not retry after the attempt budget is exhausted", async () => {
