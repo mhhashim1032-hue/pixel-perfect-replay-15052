@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeProjectSyncHistoryPage,
   safeProjectSyncEventPayload,
+  safeProjectSyncHistoryError,
 } from "@/lib/project-sync-history.server";
 
 describe("project sync history safety", () => {
@@ -36,6 +37,12 @@ describe("project sync history safety", () => {
     expect(payload).not.toHaveProperty("access_token");
     expect(payload).not.toHaveProperty("authorization");
     expect(payload).not.toHaveProperty("providerResponse");
+  });
+
+  it("redacts credentials in stored history errors", () => {
+    expect(safeProjectSyncHistoryError("Bearer abc.def sk_live_12345678 api_key=secret-value"))
+      .toBe("Bearer [REDACTED] [REDACTED_KEY] api_key=[REDACTED]");
+    expect(safeProjectSyncHistoryError(null)).toBeNull();
   });
 
   it("rejects arrays and primitives as event payloads", () => {
