@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ accountToken: vi.fn(), repoInfo: vi.fn(), headSha: vi.fn(), tree: vi.fn() }));
+const mocks = vi.hoisted(() => ({ accountToken: vi.fn(), repoInfo: vi.fn(), headSha: vi.fn(), tree: vi.fn(), signal: undefined as AbortSignal | undefined }));
 const accountToken = mocks.accountToken;
 const repoInfo = mocks.repoInfo;
 const headSha = mocks.headSha;
@@ -11,7 +11,7 @@ vi.mock("@/lib/github.server", () => ({
     repoInfo = mocks.repoInfo;
     headSha = mocks.headSha;
     tree = mocks.tree;
-    constructor(_token: string) {}
+    constructor(_token: string, signal?: AbortSignal) { mocks.signal = signal; }
   },
 }));
 
@@ -38,7 +38,7 @@ describe("pinned GitHub inspection adapter", () => {
     expect(result.outputFingerprint).toHaveLength(64);
   });
 
-  it("rejects a session owned by another user before resolving credentials", async () => {
+  it("passes worker cancellation through to the GitHub API client", async () => {\n    const controller = new AbortController();\n    await inspectPinnedGitHubRepository({ supabase: {}, userId: "user-1", session, signal: controller.signal });\n    expect(mocks.signal).toBe(controller.signal);\n  });\n\n  it("rejects a session owned by another user before resolving credentials", async () => {
     await expect(inspectPinnedGitHubRepository({ supabase: {}, userId: "user-2", session }))
       .rejects.toThrow("not owned");
     expect(accountToken).not.toHaveBeenCalled();
