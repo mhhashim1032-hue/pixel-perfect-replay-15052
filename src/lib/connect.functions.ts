@@ -36,7 +36,7 @@ export const autoFix = createServerFn({ method: "POST" })
     const level = asAutonomy(s.mode);
     const { syncProject: run } = await import("./connect.server");
     const { autoFixPrompt } = await import("./connect");
-    const r = await run(context.supabase, s, { applyMigrations: false });
+    const r = await run(context.supabase, s);
     const prompt = autoFixPrompt(r.steps, r.buildErrors);
     return {
       steps: r.steps,
