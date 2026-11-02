@@ -42,7 +42,7 @@ export function safeProjectSyncError(value: unknown): string {
   return raw
     .replace(/Bearer\s+[^\s"'<>]+/gi, "Bearer [REDACTED]")
     .replace(/(?:sk|pk|sb_secret|sb_publishable)_[A-Za-z0-9_-]{8,}/g, "[REDACTED_KEY]")
-    .replace(/(?:access_token|refresh_token|api_key|apikey|password|secret)=([^&\s]+)/gi, "$1=[REDACTED]")
+    .replace(/(access_token|refresh_token|api_key|apikey|password|secret)=([^&\s]+)/gi, "$1=[REDACTED]")
     .slice(0, 500);
 }
 
