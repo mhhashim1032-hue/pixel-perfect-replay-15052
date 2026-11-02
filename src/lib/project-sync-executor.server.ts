@@ -66,7 +66,7 @@ export function createProjectSyncExecutor(internalAdmin: SupabaseClient): Projec
   return async (step: LedgerStepLease, { signal }) => {
     signal.throwIfAborted();
     if (step.operation !== "inspect_repository") {
-      throw new Error("This project sync operation has no enabled provider executor yet.");
+      return { state: "failed", safeError: "This project sync operation has no enabled provider executor yet." };
     }
 
     const { owner, session } = await loadOwnedRunContext(internalAdmin, step.run_id);
@@ -83,7 +83,7 @@ export function createProjectSyncExecutor(internalAdmin: SupabaseClient): Projec
       credentialId: githubAccount.id,
     });
     if (expectedFingerprint !== step.input_fingerprint) {
-      throw new Error("The GitHub account, repository or branch changed after this sync plan was created. Review the plan again.");
+      return { state: "failed", safeError: "The GitHub account, repository or branch changed after this sync plan was created. Review the plan again." };
     }
 
     const result = await inspectPinnedGitHubRepository({
