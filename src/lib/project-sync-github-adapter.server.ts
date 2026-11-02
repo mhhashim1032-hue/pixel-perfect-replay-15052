@@ -57,7 +57,7 @@ export async function inspectPinnedGitHubRepository(input: {
   if (!token) throw new Error("Connect the GitHub account pinned to this project.");
 
   input.signal?.throwIfAborted();
-  const github = new GitHub(token);
+  const github = new GitHub(token, input.signal);
   try {
     const info = await github.repoInfo(repository);
     input.signal?.throwIfAborted();
