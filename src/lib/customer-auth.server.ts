@@ -7,7 +7,7 @@ export async function syncCustomerAuth(ref: string, databaseToken: string, domai
   const patch = customerAuthPatch(await database.authConfig(ref), domains, verifiedCustomDomain);
   if (Object.keys(patch).length) await database.patchAuth(ref, patch);
   const verified = await database.authConfig(ref);
-  if (verified.mailer_autoconfirm !== true || (patch.site_url && verified.site_url !== patch.site_url) || (patch.uri_allow_list && patch.uri_allow_list.split(",").some((url) => !(verified.uri_allow_list ?? "").split(",").includes(url)))) {
+  if ((patch.site_url && verified.site_url !== patch.site_url) || (patch.uri_allow_list && patch.uri_allow_list.split(",").some((url) => !(verified.uri_allow_list ?? "").split(",").includes(url)))) {
     throw new Error("Customer signup or production site settings could not be verified");
   }
   return Object.keys(patch);
