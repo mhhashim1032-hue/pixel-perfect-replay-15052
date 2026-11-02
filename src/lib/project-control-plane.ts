@@ -32,6 +32,8 @@ export type SyncPlanInput = {
   hasCommit: boolean;
   pendingMigrations: number;
   approvedOperations?: SyncOperation[];
+  /** Optional deterministic hash of the current dry-run plan; bind approvals to this value. */
+  planBinding?: string | null;
   /** Explicit run-time capability; approval never substitutes for this capability. */
   allowProductionDeployment?: boolean;
   /** Must match the immutable plan/resource/commit approval the user accepted. */
