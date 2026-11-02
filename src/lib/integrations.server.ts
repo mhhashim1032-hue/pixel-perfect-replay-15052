@@ -20,8 +20,8 @@ async function call<T>(base: string, token: string, path: string, init: RequestI
 }
 
 export class SupabaseMgmt {
-  constructor(private token: string) {}
-  private req<T = any>(p: string, i?: RequestInit) { return call<T>("https://api.supabase.com/v1", this.token, p, i); }
+  constructor(private token: string, private signal?: AbortSignal) {}
+  private req<T = any>(p: string, i?: RequestInit) { return call<T>("https://api.supabase.com/v1", this.token, p, { ...i, signal: i?.signal ?? this.signal }); }
   async projects() {
     const r = await this.req<any[]>("/projects");
     return r.map((p) => ({ ref: p.id as string, name: p.name as string, region: p.region as string, status: p.status as string }));
