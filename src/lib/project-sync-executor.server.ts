@@ -3,6 +3,7 @@ import type { LedgerStepLease } from "./project-sync-ledger.server";
 import { accountRow } from "./accounts.server";
 import { fingerprintProjectSyncPlan } from "./project-sync-ledger.server";
 import { inspectPinnedGitHubRepository } from "./project-sync-github-adapter.server";
+import { inspectPinnedSupabaseProject } from "./project-sync-supabase-adapter.server";
 import type { ProjectSyncExecutor } from "./project-sync-worker.server";
 
 type SyncRunOwner = { user_id: string; session_id: string };
@@ -11,6 +12,7 @@ type PinnedSession = {
   user_id: string;
   repo: string;
   work_branch: string;
+  supabase_ref: string | null;
   accounts?: unknown;
 };
 
@@ -36,6 +38,22 @@ export function githubInspectionInputFingerprint(input: {
   });
 }
 
+/** Fingerprint the exact Supabase project and selected credential for read-only verification. */
+export function supabaseBindingInputFingerprint(input: {
+  userId: string;
+  sessionId: string;
+  projectRef: string;
+  credentialId: string;
+}): string {
+  return fingerprintProjectSyncPlan({
+    operation: "verify_database_binding",
+    userId: input.userId,
+    sessionId: input.sessionId,
+    projectRef: input.projectRef,
+    supabaseCredentialId: input.credentialId,
+  });
+}
+
 async function loadOwnedRunContext(
   internalAdmin: SupabaseClient,
   runId: string,
@@ -49,7 +67,7 @@ async function loadOwnedRunContext(
   const owner = run as SyncRunOwner;
   const { data: session, error: sessionError } = await internalAdmin
     .from("agent_sessions")
-    .select("id, user_id, repo, work_branch, accounts")
+    .select("id, user_id, repo, work_branch, supabase_ref, accounts")
     .eq("id", owner.session_id)
     .eq("user_id", owner.user_id)
     .maybeSingle();
@@ -65,33 +83,42 @@ async function loadOwnedRunContext(
 export function createProjectSyncExecutor(internalAdmin: SupabaseClient): ProjectSyncExecutor {
   return async (step: LedgerStepLease, { signal }) => {
     signal.throwIfAborted();
-    if (step.operation !== "inspect_repository") {
+    if (step.operation !== "inspect_repository" && step.operation !== "verify_database_binding") {
       return { state: "failed", safeError: "This project sync operation has no enabled provider executor yet." };
     }
 
     const { owner, session } = await loadOwnedRunContext(internalAdmin, step.run_id);
     if (session.user_id !== owner.user_id) throw new Error("Project session ownership verification failed.");
 
-    const githubAccount = await accountRow(internalAdmin, owner.user_id, "github", session.accounts);
-    if (!githubAccount) throw new Error("Connect the GitHub account pinned to this project.");
-
-    const expectedFingerprint = githubInspectionInputFingerprint({
-      userId: owner.user_id,
-      sessionId: session.id,
-      repository: session.repo,
-      branch: session.work_branch,
-      credentialId: githubAccount.id,
-    });
-    if (expectedFingerprint !== step.input_fingerprint) {
-      return { state: "failed", safeError: "The GitHub account, repository or branch changed after this sync plan was created. Review the plan again." };
+    if (step.operation === "inspect_repository") {
+      const githubAccount = await accountRow(internalAdmin, owner.user_id, "github", session.accounts);
+      if (!githubAccount) return { state: "failed", safeError: "Connect the GitHub account pinned to this project." };
+      const expectedFingerprint = githubInspectionInputFingerprint({
+        userId: owner.user_id,
+        sessionId: session.id,
+        repository: session.repo,
+        branch: session.work_branch,
+        credentialId: githubAccount.id,
+      });
+      if (expectedFingerprint !== step.input_fingerprint) {
+        return { state: "failed", safeError: "The GitHub account, repository or branch changed after this sync plan was created. Review the plan again." };
+      }
+      const result = await inspectPinnedGitHubRepository({ supabase: internalAdmin, userId: owner.user_id, session, signal });
+      return { state: "succeeded", outputFingerprint: result.outputFingerprint };
     }
 
-    const result = await inspectPinnedGitHubRepository({
-      supabase: internalAdmin,
+    const supabaseAccount = await accountRow(internalAdmin, owner.user_id, "supabase", session.accounts);
+    if (!supabaseAccount) return { state: "failed", safeError: "Connect the Supabase account pinned to this project." };
+    const expectedFingerprint = supabaseBindingInputFingerprint({
       userId: owner.user_id,
-      session,
-      signal,
+      sessionId: session.id,
+      projectRef: session.supabase_ref ?? "",
+      credentialId: supabaseAccount.id,
     });
+    if (expectedFingerprint !== step.input_fingerprint) {
+      return { state: "failed", safeError: "The Supabase account or project changed after this sync plan was created. Review the plan again." };
+    }
+    const result = await inspectPinnedSupabaseProject({ supabase: internalAdmin, userId: owner.user_id, session, signal });
     return { state: "succeeded", outputFingerprint: result.outputFingerprint };
   };
 }
