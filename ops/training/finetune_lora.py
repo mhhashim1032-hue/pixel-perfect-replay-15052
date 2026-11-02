@@ -155,6 +155,8 @@ def main() -> int:
     )
     tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.revision, trust_remote_code=args.trust_remote_code)
     if tokenizer.pad_token_id is None:
+        if tokenizer.eos_token is None:
+            raise SystemExit("Tokenizer has neither a pad token nor an EOS token.")
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
