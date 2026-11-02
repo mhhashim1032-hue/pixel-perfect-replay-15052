@@ -62,4 +62,41 @@ describe("customer project control-plane planning", () => {
     expect(plan.steps.find((step) => step.operation === "verify_database_binding")?.state).toBe("not_applicable");
     expect(plan.steps.find((step) => step.operation === "sync_environment")?.state).toBe("not_applicable");
   });
+
+  it("requires an approval bound to the current plan before a migration can run", () => {
+    const plan = buildProjectSyncPlan(input({ approvedOperations: ["apply_migrations"], approvalBinding: "old", currentPlanBinding: "new" }));
+    expect(plan.steps.find((step) => step.operation === "apply_migrations")?.state).toBe("approval_required");
+    expect(plan.canStart).toBe(false);
+  });
+
+  it("does not let migration approval implicitly authorize production deployment", () => {
+    const plan = buildProjectSyncPlan(input({
+      approvedOperations: ["apply_migrations"],
+      approvalBinding: "current",
+      currentPlanBinding: "current",
+      allowProductionDeployment: false,
+    }));
+    expect(plan.steps.find((step) => step.operation === "apply_migrations")?.state).toBe("ready");
+    expect(plan.steps.find((step) => step.operation === "deploy_exact_commit")?.state).toBe("blocked");
+    expect(plan.steps.find((step) => step.operation === "verify_runtime")?.state).toBe("blocked");
+  });
+
+  it("requires exact-plan approval before deploying and verifying runtime", () => {
+    const plan = buildProjectSyncPlan(input({
+      allowProductionDeployment: true,
+      approvedOperations: ["apply_migrations", "deploy_exact_commit"],
+      approvalBinding: "plan-123",
+      currentPlanBinding: "plan-123",
+    }));
+    expect(plan.steps.find((step) => step.operation === "deploy_exact_commit")?.state).toBe("ready");
+    expect(plan.steps.find((step) => step.operation === "verify_runtime")?.state).toBe("ready");
+  });
+
+  it("does not allow a missing provider resource to be treated as connected", () => {
+    const providers = { ...connected, supabase: { ...connected.supabase, resourceSelected: false } };
+    const plan = buildProjectSyncPlan(input({ providers }));
+    expect(plan.steps.find((step) => step.operation === "verify_database_binding")?.state).toBe("blocked");
+    expect(plan.canStart).toBe(false);
+  });
+
 });
