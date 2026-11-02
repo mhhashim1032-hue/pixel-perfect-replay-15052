@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 type RemoteKeeperConfig = {
   baseUrl: string;
   secret: string;
@@ -6,7 +8,7 @@ type RemoteKeeperConfig = {
 type RemoteKeeperResult = { ok: true } | { ok: false; status: number; message: string };
 
 type KeeperOptions = {
-  sb: any;
+  sb: SupabaseClient;
   userId: string;
   sessionId: string;
   origin: string;
