@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ accountToken: vi.fn(), repoInfo: vi.fn(), headSha: vi.fn(), tree: vi.fn() }));
+const accountToken = mocks.accountToken;
+const repoInfo = mocks.repoInfo;
+const headSha = mocks.headSha;
 
 vi.mock("@/lib/accounts.server", () => ({ accountToken: (...args: unknown[]) => mocks.accountToken(...args) }));
 vi.mock("@/lib/github.server", () => ({
