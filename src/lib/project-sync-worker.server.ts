@@ -98,6 +98,7 @@ export async function runProjectSyncWorkerOnce(input: {
 
   let outcome: ProjectSyncExecutionResult;
   try {
+    if (abort.signal.aborted) throw abort.signal.reason ?? new Error("Project sync worker was cancelled.");
     outcome = await input.execute(lease, { signal: abort.signal });
     if (!outcome || !["succeeded", "skipped", "retryable", "failed"].includes(outcome.state)) {
       throw new Error("Project sync executor returned an invalid result.");
