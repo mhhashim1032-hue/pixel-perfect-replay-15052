@@ -3,10 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { agentRequest, requestError } from "@/lib/agent-request";
 import { agentOrigin } from "@/lib/background-run";
 import { z } from "zod";
-import { getInternalLedgerAdmin } from "@/lib/internal-ledger-client.server";
-import { createProjectSyncExecutor } from "@/lib/project-sync-executor.server";
-import { runProjectSyncWorkerBatch } from "@/lib/project-sync-worker.server";
-import { isValidProjectSyncWorkerSecret } from "@/lib/project-sync-worker-auth.server";
 
 // Starts a run that keeps going when the user's device sleeps or switches apps:
 // a small cloud keeper holds the agent stream open instead of the browser.
@@ -17,6 +13,7 @@ export const Route = createFileRoute("/api/agent-background")({
         // Private worker mode shares this already-registered route but uses a separate
         // marker and server-only secret; ordinary user Bearer-token behavior is unchanged.
         if (request.headers.get("x-forge-sync-worker") === "1") {
+          const { isValidProjectSyncWorkerSecret } = await import("@/lib/project-sync-worker-auth.server");
           if (!isValidProjectSyncWorkerSecret(
             request.headers.get("authorization"),
             process.env["FORGE_SYNC_WORKER_SECRET"],
@@ -26,6 +23,11 @@ export const Route = createFileRoute("/api/agent-background")({
           const workerInput = z.object({ runId: z.string().uuid() }).strict().safeParse(workerPayload);
           if (!workerInput.success) return new Response("Invalid worker request", { status: 400 });
           try {
+            const [{ getInternalLedgerAdmin }, { createProjectSyncExecutor }, { runProjectSyncWorkerBatch }] = await Promise.all([
+              import("@/lib/internal-ledger-client.server"),
+              import("@/lib/project-sync-executor.server"),
+              import("@/lib/project-sync-worker.server"),
+            ]);
             const internalAdmin = getInternalLedgerAdmin();
             const result = await runProjectSyncWorkerBatch({
               internalAdmin,
