@@ -33,7 +33,7 @@ describe("project sync history safety", () => {
       attempt: 2,
       outputFingerprint: "abc123",
     });
-    expect(payload.error).toHaveLength(300);
+    expect(payload["error"]).toHaveLength(300);
     expect(payload).not.toHaveProperty("access_token");
     expect(payload).not.toHaveProperty("authorization");
     expect(payload).not.toHaveProperty("providerResponse");
