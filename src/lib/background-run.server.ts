@@ -1,4 +1,4 @@
-import { KEEPER_SCRIPT, readKeeperProbe } from "./background-run";
+import { isE2BKeeperEnabled, KEEPER_SCRIPT, readKeeperProbe } from "./background-run";
 import { startRemoteKeeper, stopRemoteKeeper } from "./remote-keeper.server";
 
 const KEEPER_TIMEOUT_MS = 60 * 60_000;
@@ -14,7 +14,7 @@ export async function startKeeper(opts: { sb: any; userId: string; sessionId: st
   // Prefer the user's zero-cost Oracle/remote keeper when explicitly configured.
   // E2B remains an optional compatibility fallback for existing installations.
   if (process.env["FORGE_KEEPER_URL"]?.trim()) return startRemoteKeeper(opts);
-  if (process.env["FORGE_DISABLE_E2B_KEEPER"] === "true") return null;
+  if (!isE2BKeeperEnabled(process.env)) return null;
   const apiKey = process.env["E2B_API_KEY"];
   if (!apiKey) return null;
   const { data: before } = await opts.sb.from("agent_sessions").select("execution_id, stop_requested").eq("id", opts.sessionId).eq("user_id", opts.userId).single();
