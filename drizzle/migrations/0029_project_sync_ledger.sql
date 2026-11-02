@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS public.project_sync_steps (
   UNIQUE (run_id, step_key),
   CHECK ((state = 'leased' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL) OR (state <> 'leased' AND lease_token IS NULL AND lease_expires_at IS NULL))
 );
+ALTER TABLE public.project_sync_steps
+  ADD COLUMN IF NOT EXISTS depends_on text[] NOT NULL DEFAULT '{}';
+
 CREATE INDEX IF NOT EXISTS project_sync_steps_claim
   ON public.project_sync_steps(state, next_retry_at, lease_expires_at, created_at);
 
@@ -100,11 +103,20 @@ BEGIN
     WHERE id = _run AND status IN ('queued','running');
   IF NOT FOUND THEN RETURN; END IF;
   WITH candidate AS (
-    SELECT id FROM public.project_sync_steps
-    WHERE run_id = _run AND attempt < max_attempts
-      AND ((state IN ('queued','retryable') AND coalesce(next_retry_at, now()) <= now())
-        OR (state = 'leased' AND lease_expires_at <= now()))
-    ORDER BY created_at, id
+    SELECT s.id FROM public.project_sync_steps s
+    WHERE s.run_id = _run AND s.attempt < s.max_attempts
+      AND ((s.state IN ('queued','retryable') AND coalesce(s.next_retry_at, now()) <= now())
+        OR (s.state = 'leased' AND s.lease_expires_at <= now()))
+      AND NOT EXISTS (
+        SELECT 1 FROM unnest(s.depends_on) AS dependency(step_key)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM public.project_sync_steps prerequisite
+          WHERE prerequisite.run_id = s.run_id
+            AND prerequisite.step_key = dependency.step_key
+            AND prerequisite.state IN ('succeeded','skipped')
+        )
+      )
+    ORDER BY s.created_at, s.id
     FOR UPDATE SKIP LOCKED
     LIMIT 1
   )
@@ -164,3 +176,117 @@ REVOKE ALL ON FUNCTION public.project_sync_append_event(uuid, text, text, jsonb)
 GRANT EXECUTE ON FUNCTION public.project_sync_claim_step(uuid, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.project_sync_finish_step(uuid, uuid, text, text, text, timestamptz) TO service_role;
 GRANT EXECUTE ON FUNCTION public.project_sync_append_event(uuid, text, text, jsonb) TO service_role;
+
+-- Create a run and its immutable step graph in one transaction. The session owner is
+-- checked independently of the supplied user id; idempotent retries return the original run.
+CREATE OR REPLACE FUNCTION public.project_sync_create_run(
+  _user uuid, _session uuid, _idempotency_key text, _plan_binding text, _steps jsonb
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE run_id uuid; existing_binding text; existing_session uuid; item jsonb; step_count integer;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+  IF length(coalesce(_idempotency_key,'')) NOT BETWEEN 8 AND 200
+    OR length(coalesce(_plan_binding,'')) NOT BETWEEN 8 AND 512
+    OR jsonb_typeof(_steps) <> 'array' THEN
+    RAISE EXCEPTION 'invalid sync run input' USING ERRCODE = '22023';
+  END IF;
+  SELECT count(*) INTO step_count FROM jsonb_array_elements(_steps);
+  IF step_count < 1 OR step_count > 50 THEN
+    RAISE EXCEPTION 'sync run must contain 1 to 50 steps' USING ERRCODE = '22023';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.agent_sessions WHERE id = _session AND user_id = _user) THEN
+    RAISE EXCEPTION 'session owner mismatch' USING ERRCODE = '42501';
+  END IF;
+  INSERT INTO public.project_sync_runs(user_id, session_id, idempotency_key, plan_binding)
+    VALUES (_user, _session, _idempotency_key, _plan_binding)
+    ON CONFLICT (user_id, idempotency_key) DO NOTHING
+    RETURNING id INTO run_id;
+  IF run_id IS NULL THEN
+    SELECT id, plan_binding, session_id INTO run_id, existing_binding, existing_session
+      FROM public.project_sync_runs WHERE user_id = _user AND idempotency_key = _idempotency_key;
+    IF existing_binding <> _plan_binding OR existing_session <> _session THEN
+      RAISE EXCEPTION 'idempotency key already belongs to a different plan' USING ERRCODE = '23505';
+    END IF;
+    RETURN run_id;
+  END IF;
+  FOR item IN SELECT value FROM jsonb_array_elements(_steps)
+  LOOP
+    IF coalesce(item->>'step_key','') = '' OR coalesce(item->>'operation','') = ''
+      OR coalesce(item->>'input_fingerprint','') = '' THEN
+      RAISE EXCEPTION 'each sync step requires key, operation and input fingerprint' USING ERRCODE = '22023';
+    END IF;
+    INSERT INTO public.project_sync_steps(
+      run_id, step_key, operation, state, input_fingerprint, depends_on, approval_binding
+    ) VALUES (
+      run_id, item->>'step_key', item->>'operation',
+      CASE WHEN item->>'state' = 'approval_required' THEN 'approval_required' ELSE 'queued' END,
+      item->>'input_fingerprint',
+      ARRAY(SELECT jsonb_array_elements_text(coalesce(item->'depends_on','[]'::jsonb))),
+      item->>'approval_binding'
+    );
+  END LOOP;
+  IF EXISTS (
+    SELECT 1 FROM public.project_sync_steps s
+    CROSS JOIN LATERAL unnest(s.depends_on) d
+    WHERE s.run_id = run_id AND NOT EXISTS (
+      SELECT 1 FROM public.project_sync_steps p WHERE p.run_id = s.run_id AND p.step_key = d
+    )
+  ) THEN
+    RAISE EXCEPTION 'sync graph references an unknown prerequisite' USING ERRCODE = '22023';
+  END IF;
+  RETURN run_id;
+END;
+$$;
+
+-- Lease renewal is compare-and-set; a worker that lost its lease cannot resurrect it.
+CREATE OR REPLACE FUNCTION public.project_sync_renew_step(
+  _step uuid, _lease_token uuid, _lease_seconds integer DEFAULT 90
+) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+  IF _lease_seconds < 15 OR _lease_seconds > 900 THEN
+    RAISE EXCEPTION 'lease duration out of range' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.project_sync_steps SET lease_expires_at = now() + make_interval(secs => _lease_seconds), updated_at = now()
+    WHERE id = _step AND state = 'leased' AND lease_token = _lease_token AND lease_expires_at > now();
+  RETURN FOUND;
+END;
+$$;
+
+-- Finalize only when no runnable/leased/approval-required steps remain.
+CREATE OR REPLACE FUNCTION public.project_sync_finalize_run(_run uuid) RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE result text;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.project_sync_steps WHERE run_id = _run AND state IN ('queued','leased','retryable')) THEN
+    RETURN 'running';
+  END IF;
+  SELECT CASE
+    WHEN bool_or(state = 'failed') THEN 'failed'
+    WHEN bool_or(state = 'approval_required') THEN 'partial'
+    WHEN bool_and(state IN ('succeeded','skipped','cancelled')) THEN
+      CASE WHEN bool_or(state = 'cancelled') THEN 'cancelled' ELSE 'succeeded' END
+    ELSE 'partial'
+  END INTO result FROM public.project_sync_steps WHERE run_id = _run;
+  UPDATE public.project_sync_runs SET status = result, updated_at = now(),
+    finished_at = CASE WHEN result = 'running' THEN NULL ELSE now() END
+    WHERE id = _run AND status IN ('queued','running','partial');
+  RETURN result;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.project_sync_create_run(uuid, uuid, text, text, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.project_sync_renew_step(uuid, uuid, integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.project_sync_finalize_run(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.project_sync_create_run(uuid, uuid, text, text, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.project_sync_renew_step(uuid, uuid, integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.project_sync_finalize_run(uuid) TO service_role;
