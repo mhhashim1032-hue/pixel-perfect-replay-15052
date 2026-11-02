@@ -19,7 +19,7 @@ UAF is Forge's model-independent operating framework. Forge remains the working 
 ## Structure
 - `constitution.md`: permanent operating principles.
 - `protocols/`: task, tool, sync, recovery and verification contracts.
-- `skills/`: original Forge skill definitions.
+- `.agents/skills/`: repository-facing Forge skill definitions; `src/lib/free-skills.ts` registers the runtime skills used by the live agent.
 - `schemas/`: portable JSON schemas.
 - `evaluations/`: model-agnostic behavioral test cases and scoring.
 
