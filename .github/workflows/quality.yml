@@ -39,6 +39,8 @@ jobs:
           bun-version: latest
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
+      - name: Validate cloud bootstrap shell syntax
+        run: bash -n ops/free-cloud/oci-bootstrap.sh
       - name: Typecheck
         run: bunx tsc --noEmit
       - name: Lint changed TypeScript and JavaScript files
