@@ -40,7 +40,6 @@ export function customerAuthPatch(cfg: { site_url?: string; uri_allow_list?: str
   const merged = mergeAllowList(cfg.uri_allow_list, requiredAuthUrls(domains));
   const site = pickSiteUrl(cfg.site_url, domains, verifiedCustomDomain);
   return {
-    ...(cfg.mailer_autoconfirm !== true ? { mailer_autoconfirm: true } : {}),
     ...(merged.added.length ? { uri_allow_list: merged.value } : {}),
     ...(site ? { site_url: site } : {}),
   };
