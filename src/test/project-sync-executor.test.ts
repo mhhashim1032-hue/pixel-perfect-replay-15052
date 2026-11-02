@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { githubInspectionInputFingerprint, supabaseBindingInputFingerprint, createProjectSyncExecutor } from "@/lib/project-sync-executor.server";
+import { githubInspectionInputFingerprint, supabaseBindingInputFingerprint, vercelBindingInputFingerprint, createProjectSyncExecutor } from "@/lib/project-sync-executor.server";
 
 describe("project sync executor allowlist", () => {
   it("binds GitHub inspection to the exact user, session, repository, branch and credential", () => {
@@ -19,6 +19,16 @@ describe("project sync executor allowlist", () => {
     expect(supabaseBindingInputFingerprint(input)).toBe(fingerprint);
     expect(supabaseBindingInputFingerprint({ ...input, projectRef: "zyxwvutsrqponmlkjihgf" })).not.toBe(fingerprint);
     expect(supabaseBindingInputFingerprint({ ...input, credentialId: "supabase-account-2" })).not.toBe(fingerprint);
+  });
+
+  it("binds Vercel verification to the exact project, repository and credential", () => {
+    const input = { userId: "user-1", sessionId: "session-1", projectId: "prj_123", repository: "owner/repo", credentialId: "vercel-account-1" };
+    const fingerprint = vercelBindingInputFingerprint(input);
+    expect(fingerprint).toHaveLength(64);
+    expect(vercelBindingInputFingerprint(input)).toBe(fingerprint);
+    expect(vercelBindingInputFingerprint({ ...input, projectId: "prj_456" })).not.toBe(fingerprint);
+    expect(vercelBindingInputFingerprint({ ...input, repository: "owner/other" })).not.toBe(fingerprint);
+    expect(vercelBindingInputFingerprint({ ...input, credentialId: "vercel-account-2" })).not.toBe(fingerprint);
   });
 
   it("rejects every provider operation except the explicitly implemented GitHub inspection", async () => {
