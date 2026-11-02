@@ -148,7 +148,7 @@ BEGIN
   IF coalesce(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
   END IF;
-  IF _state NOT IN ('succeeded','skipped','retryable','failed','cancelled') THEN
+  IF _state IS NULL OR _state NOT IN ('succeeded','skipped','retryable','failed','cancelled') THEN
     RAISE EXCEPTION 'invalid terminal step state' USING ERRCODE = '22023';
   END IF;
   UPDATE public.project_sync_steps
