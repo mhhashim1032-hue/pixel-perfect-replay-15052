@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SyncOperation } from "./project-control-plane";
+import { stablePlanBinding, type ProjectSyncPlan, type SyncOperation } from "./project-control-plane";
 
 export type LedgerStepInput = {
   stepKey: string;
@@ -9,6 +10,49 @@ export type LedgerStepInput = {
   state?: "queued" | "approval_required";
   approvalBinding?: string | null;
 };
+
+
+/** SHA-256 of canonical plan/resource/commit data for immutable approval binding. */
+export function fingerprintProjectSyncPlan(value: unknown): string {
+  return createHash("sha256").update(stablePlanBinding(value)).digest("hex");
+}
+
+/**
+ * Converts a reviewed dry-run plan into the durable ledger DAG.
+ * Non-applicable operations are removed; downstream dependencies on them are pruned.
+ * Approval-gated operations remain gated. A blocked root (missing resource/policy)
+ * prevents run creation, while downstream steps waiting only on an approval remain queued.
+ */
+export function projectSyncPlanToLedgerSteps(
+  plan: ProjectSyncPlan,
+  inputFingerprints: Partial<Record<SyncOperation, string>>,
+  approvalBindings: Partial<Record<SyncOperation, string>> = {},
+): LedgerStepInput[] {
+  const notApplicable = new Set(plan.steps.filter((step) => step.state === "not_applicable").map((step) => step.operation));
+  const blocking = plan.steps.find((step) => step.state === "blocked" && !step.reason.startsWith("Waiting for prerequisite:"));
+  if (blocking) throw new Error(`Cannot persist a blocked project sync plan: ${blocking.operation}: ${blocking.reason}`);
+
+  const result = plan.steps
+    .filter((step) => step.state !== "not_applicable")
+    .map((step): LedgerStepInput => {
+      const inputFingerprint = inputFingerprints[step.operation];
+      if (!inputFingerprint) throw new Error(`Missing input fingerprint for ${step.operation}.`);
+      const approvalRequired = step.state === "approval_required";
+      const approvalBinding = approvalBindings[step.operation] ?? null;
+      if (approvalRequired && !approvalBinding) throw new Error(`Missing exact approval binding for ${step.operation}.`);
+      return {
+        stepKey: step.operation,
+        operation: step.operation,
+        inputFingerprint,
+        dependsOn: step.dependsOn.filter((dependency) => !notApplicable.has(dependency)),
+        state: approvalRequired ? "approval_required" : "queued",
+        approvalBinding,
+      };
+    });
+  const invalid = validateLedgerSteps(result);
+  if (invalid) throw new Error(invalid);
+  return result;
+}
 
 export type LedgerStepLease = {
   id: string;
