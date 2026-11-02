@@ -1,4 +1,4 @@
-// "Connect & sync": one pass that wires GitHub + database + Vercel together and reports health.
+// "Connect & sync": read-only inspection of the customer-pinned GitHub, Supabase and Vercel resources.
 import { accountToken } from "./accounts.server";
 import { orderDomains, overall, type SyncStep } from "./connect";
 
@@ -12,7 +12,10 @@ const safe = (e: unknown) => {
   // Provider errors are summarised; never echo credential-bearing bodies.
   if (/permission|403/i.test(m)) return "your saved token doesn't have permission for this";
   if (/401|unauthor/i.test(m)) return "the saved token was rejected; reconnect the account";
-  return m.slice(0, 160);
+  return m
+    .replace(/Bearer\\s+[^\\s]+/gi, "Bearer [redacted]")
+    .replace(/(access[_-]?token|refresh[_-]?token|api[_-]?key|secret|password)\\s*[:=]\\s*["\\x27]?[^,\\s"\\x27]+/gi, "$1=[redacted]")
+    .slice(0, 160);
 };
 
 export async function syncProject(sb: any, s: Session) {
