@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { agentOrigin, readKeeperProbe } from "@/lib/background-run";
+import { agentOrigin, isE2BKeeperEnabled, readKeeperProbe } from "@/lib/background-run";
 
 const req = (url: string, headers: Record<string, string> = {}) => new Request(url, { method: "POST", headers });
+
+describe("E2B keeper cost control", () => {
+  it("keeps the compatibility fallback enabled by default", () => {
+    expect(isE2BKeeperEnabled({})).toBe(true);
+  });
+  it("can disable E2B to avoid paid sandbox usage", () => {
+    expect(isE2BKeeperEnabled({ FORGE_DISABLE_E2B_KEEPER: "true" })).toBe(false);
+  });
+});
 
 describe("agentOrigin", () => {
   it("uses the public forwarded host over https", () => {
