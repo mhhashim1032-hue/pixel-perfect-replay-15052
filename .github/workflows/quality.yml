@@ -57,6 +57,7 @@ jobs:
           bash -n ops/free-cloud/oci-bootstrap.sh
           bash -n ops/oci-keeper/install.sh
           node --check ops/oci-keeper/server.mjs
+          node --test ops/oci-keeper/server.test.mjs
       - name: Typecheck
         run: bunx tsc --noEmit
       - name: Lint changed TypeScript and JavaScript files
