@@ -6,13 +6,13 @@ The server-only worker now supports one-step execution and bounded sequential ba
 
 Read-only GitHub, Supabase and Vercel provider adapters are wired into the allowlisted executor. The worker must not be exposed as a public endpoint. A trusted server-side caller must validate the exact plan/resource/commit approval before passing an allowlisted executor. External writes must be idempotent and verified by reading provider state back.
 
-Remaining work: secured scheduler/trigger, per-user authorization and concurrency limits, history/cancellation UI, disposable internal database migration validation, and a security review. The internal ledger client is only for Forge's own database; never pass a connected customer database client to it.
+Remaining work: scheduler deployment, per-user concurrency limits, history/cancellation UI, disposable internal database migration validation, and a security review. The internal ledger client is only for Forge's own database; never pass a connected customer database client to it.
 
 ## First provider executor (read-only)
 
 A server-only allowlisted executor now supports `inspect_repository` for GitHub, `verify_database_binding` for Supabase, and `verify_deployment_binding` for Vercel. It reloads the run owner and task session from Forge's internal database, resolves only the GitHub credential selected for that session, and rejects an input fingerprint that does not match the current user/session/repository/branch/credential tuple. The GitHub adapter checks the branch head before and after reading the tree and refuses success if the branch moved during inspection. The Supabase adapter reads the status of the exact pinned project through the Supabase Management API; it does not run SQL or change project settings. The Vercel adapter reads the exact pinned project and its domains, then fingerprints whether its GitHub repository link matches the task's pinned repository. All three adapters pass worker cancellation to provider requests and bind execution to the selected credential record.
 
-All other operations return a terminal failed result until their own reviewed adapters are implemented. In particular, there is no customer Supabase migration, environment update, Auth change, Vercel deploy, branch write, or public worker trigger enabled by this executor. The run creator and secured trigger are still not wired into the product UI.
+All other operations return a terminal failed result until their own reviewed adapters are implemented. In particular, there is no customer Supabase migration, environment update, Auth change, Vercel deploy, branch write, or public worker trigger enabled by this executor. The authenticated run creator and secret-protected worker trigger exist server-side, but neither is scheduled or wired into the product UI.
 
 ## Compute
 
@@ -35,3 +35,8 @@ A bounded worker mode on the existing `POST /api/agent-background` endpoint is n
 Each invocation processes at most three ready steps with 90-second fenced leases and propagates request cancellation. The executor still permits only the three read-only provider inspections; all customer writes remain disabled. Missing or weak secrets fail closed. The secret must be configured only in a trusted server/worker environment and must never be exposed to browser code.
 
 This endpoint is not scheduled or deployed by this change. It remains unusable until Forge's dedicated internal ledger URL, service-role key, worker secret and internal migration are configured. Do not point the internal ledger variables at a customer Supabase project. No VM, scheduler, secret or database has been provisioned or modified.
+
+
+## Sync history reader
+
+The authenticated `getProjectSyncHistory` server function now reads run history for a task only after re-authorizing that task through the signed-in user's Supabase session. Internal ledger queries are additionally filtered by the authenticated user ID and task ID. Results include bounded run/step summaries and a capped event feed; sensitive plan bindings, idempotency keys, lease tokens and provider credentials are never returned. Event payloads are allowlisted to a small set of display fields. The client-side history panel, pagination controls, retry/cancel actions and live refresh are not yet implemented.
