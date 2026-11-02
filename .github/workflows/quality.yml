@@ -46,7 +46,7 @@ jobs:
       - name: Lint changed TypeScript and JavaScript files
         shell: bash
         run: |
-          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts
+          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts src/lib/project-sync-github-adapter.server.ts src/lib/project-sync-executor.server.ts src/test/project-sync-github-adapter.test.ts src/test/project-sync-executor.test.ts
       - name: Unit tests
         run: bun run test
       - name: Production build
