@@ -36,7 +36,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
   ca-certificates curl git jq unzip xz-utils build-essential \
-  python3 python3-venv python3-pip ufw fail2ban unattended-upgrades
+  python3 python3-venv python3-pip gnupg ufw fail2ban unattended-upgrades
 
 # Install Node.js 22 LTS for app tooling; use the official NodeSource repository.
 install -d -m 0755 /etc/apt/keyrings
@@ -69,6 +69,8 @@ systemctl enable --now docker
 
 # Do not add the forge account to the docker group: Docker access is effectively root.
 # Future worker isolation must use a dedicated, restricted execution boundary.
+ufw default deny incoming
+ufw default allow outgoing
 ufw allow "${SSH_PORT}/tcp"
 ufw --force enable
 systemctl enable --now fail2ban
