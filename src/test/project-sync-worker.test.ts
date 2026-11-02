@@ -101,6 +101,43 @@ describe("durable project sync worker", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
+  it("runs a bounded batch and stops when no work is claimable", async () => {
+    const db = admin();
+    let claims = 0;
+    db.rpc.mockImplementation(async (name: string) => {
+      if (name === "project_sync_claim_step") {
+        claims += 1;
+        return { data: claims === 1 ? [lease] : [], error: null };
+      }
+      if (name === "project_sync_finalize_run") return { data: "succeeded", error: null };
+      return { data: true, error: null };
+    });
+    const execute = vi.fn(async () => ({ state: "succeeded" as const }));
+    const result = await runProjectSyncWorkerBatch({
+      internalAdmin: db.client,
+      runId: "run-1",
+      execute,
+      maxSteps: 5,
+    });
+    expect(result.processed).toBe(1);
+    expect(result.idle).toBe(true);
+    expect(result.results).toHaveLength(2);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a pre-aborted batch before claiming work", async () => {
+    const db = admin();
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled by caller"));
+    await expect(runProjectSyncWorkerBatch({
+      internalAdmin: db.client,
+      runId: "run-1",
+      execute: vi.fn(),
+      signal: controller.signal,
+    })).rejects.toThrow("cancelled by caller");
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+
   it("redacts common credentials from provider errors", () => {
     expect(safeProjectSyncError(new Error("Bearer abc.def sk_live_12345678 api_key=secret-value")))
       .toBe("Bearer [REDACTED] [REDACTED_KEY] api_key=[REDACTED]");
