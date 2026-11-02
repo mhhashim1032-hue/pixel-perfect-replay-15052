@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isE2BKeeperEnabled, KEEPER_SCRIPT, readKeeperProbe } from "./background-run";
 import { startRemoteKeeper, stopRemoteKeeper } from "./remote-keeper.server";
 
@@ -7,10 +8,10 @@ const ACCEPT_WAIT_MS = 75_000;
 type Result = { ok: true } | { ok: false; status: number; message: string };
 
 /**
- * Starts a dedicated, short-lived E2B sandbox that only holds the agent stream open.
- * It never contains the repository, so repo code cannot read the user's session token.
+ * Starts the configured remote keeper or optional E2B relay for a long-lived agent stream.
+ * The keeper never receives repository files or customer provider credentials.
  */
-export async function startKeeper(opts: { sb: any; userId: string; sessionId: string; origin: string; token: string; body: string; recovery?: boolean }): Promise<Result | null> {
+export async function startKeeper(opts: { sb: SupabaseClient; userId: string; sessionId: string; origin: string; token: string; body: string; recovery?: boolean }): Promise<Result | null> {
   // Prefer the user's zero-cost Oracle/remote keeper when explicitly configured.
   // E2B remains an optional compatibility fallback for existing installations.
   if (process.env["FORGE_KEEPER_URL"]?.trim()) return startRemoteKeeper(opts);
@@ -43,7 +44,7 @@ export async function startKeeper(opts: { sb: any; userId: string; sessionId: st
       }
       const probe = await box.commands
         .run(`printf '%s|%s|' "$(cat /tmp/done 2>/dev/null)" "$(head -1 /tmp/headers 2>/dev/null | tr -d '\\r')"; [ -f /tmp/done ] && head -c 1000 /tmp/out.ndjson`, { timeoutMs: 10_000 })
-        .catch((e: any) => e);
+        .catch((error: unknown) => ({ stdout: error instanceof Error ? error.message : String(error) }));
       const res = readKeeperProbe(String(probe?.stdout ?? ""));
       if (!res) continue;
       if (res.accepted) return { ok: true };
