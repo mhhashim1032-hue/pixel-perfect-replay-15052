@@ -46,7 +46,7 @@ jobs:
       - name: Lint changed TypeScript and JavaScript files
         shell: bash
         run: |
-          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts src/lib/project-sync-github-adapter.server.ts src/lib/project-sync-executor.server.ts src/lib/project-sync-launch.server.ts src/lib/project-sync-supabase-adapter.server.ts src/lib/project-sync-vercel-adapter.server.ts src/lib/project-sync-worker-auth.server.ts src/routes/api/agent-background.ts src/test/project-sync-github-adapter.test.ts src/test/project-sync-executor.test.ts src/test/project-sync-launch.test.ts src/test/project-sync-supabase-adapter.test.ts src/test/project-sync-vercel-adapter.test.ts src/test/project-sync-worker-auth.test.ts
+          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts src/lib/project-sync-github-adapter.server.ts src/lib/project-sync-executor.server.ts src/lib/project-sync-launch.server.ts src/lib/project-sync-history.server.ts src/lib/project-sync-supabase-adapter.server.ts src/lib/project-sync-vercel-adapter.server.ts src/lib/project-sync-worker-auth.server.ts src/routes/api/agent-background.ts src/test/project-sync-github-adapter.test.ts src/test/project-sync-executor.test.ts src/test/project-sync-launch.test.ts src/test/project-sync-history.test.ts src/test/project-sync-supabase-adapter.test.ts src/test/project-sync-vercel-adapter.test.ts src/test/project-sync-worker-auth.test.ts
       - name: Unit tests
         run: bun run test
       - name: Production build
