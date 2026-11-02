@@ -79,6 +79,7 @@ describe("reasoning profiles", () => {
       known: false, toolCalling: false, vision: false, reasoningControls: false, contextWindow: null, requiresCapabilityProbe: true,
     });
   });
+});
 
 describe("routing and team sizing", () => {
   it("single-model config routes every role to the master truthfully", () => {
