@@ -70,6 +70,16 @@ describe("reasoning profiles", () => {
   });
 });
 
+
+  it("exposes a stable Forge identity and universal operating contract", async () => {
+    const { FORGE_OPERATING_CONTRACT, modelOperatingCapabilities } = await import("@/lib/engine/reasoning");
+    expect(FORGE_OPERATING_CONTRACT).toContain("Identity: Forge");
+    expect(FORGE_OPERATING_CONTRACT).toContain("task-pinned");
+    expect(modelOperatingCapabilities("some-unknown-model")).toEqual({
+      known: false, toolCalling: false, reasoningControls: false, requiresCapabilityProbe: true,
+    });
+  });
+
 describe("routing and team sizing", () => {
   it("single-model config routes every role to the master truthfully", () => {
     const r = { master: "m", coding: null, reviewer: null, fallback: null };
