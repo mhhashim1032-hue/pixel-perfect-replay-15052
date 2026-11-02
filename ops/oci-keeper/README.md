@@ -83,4 +83,6 @@ The service logs lifecycle errors only; it must never log request bodies, bearer
 - The service does not run repository code and is not a self-hosted GitHub Actions runner.
 - The VM remains user-owned. No instance, tunnel, DNS record, environment variable, or database migration is provisioned automatically by this repository.
 
+The Oracle keeper is only the long-lived agent-stream relay. The project-sync ledger queue is dispatched separately by the Forge app's existing scheduled endpoint, /api/public/jobs/resume-runs; ensure your app scheduler invokes that endpoint with its configured cron authorization. The keeper does not poll or execute project-sync ledger jobs.
+
 This is a best-effort background stream relay, not an uptime SLA. Oracle Always Free capacity and Cloudflare account limits apply.
