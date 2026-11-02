@@ -13,8 +13,8 @@ const safe = (e: unknown) => {
   if (/permission|403/i.test(m)) return "your saved token doesn't have permission for this";
   if (/401|unauthor/i.test(m)) return "the saved token was rejected; reconnect the account";
   return m
-    .replace(/Bearer\\s+[^\\s]+/gi, "Bearer [redacted]")
-    .replace(/(access[_-]?token|refresh[_-]?token|api[_-]?key|secret|password)\\s*[:=]\\s*["\\x27]?[^,\\s"\\x27]+/gi, "$1=[redacted]")
+    .replace(/Bearer\s+[^\s]+/gi, "Bearer [redacted]")
+    .replace(/(access[_-]?token|refresh[_-]?token|api[_-]?key|secret|password)\s*[:=]\s*["'\x27]?[^\s,"'\x27]+/gi, "$1=[redacted]")
     .slice(0, 160);
 };
 
