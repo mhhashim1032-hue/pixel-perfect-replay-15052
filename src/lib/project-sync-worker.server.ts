@@ -59,6 +59,7 @@ export async function runProjectSyncWorkerOnce(input: {
   runId: string;
   execute: ProjectSyncExecutor;
   leaseSeconds?: number;
+  signal?: AbortSignal;
 }): Promise<ProjectSyncWorkerResult> {
   const leaseSeconds = Math.max(15, Math.min(900, Math.floor(input.leaseSeconds ?? 90)));
   const lease = await claimProjectSyncStep(input.internalAdmin, input.runId, leaseSeconds);
@@ -69,6 +70,12 @@ export async function runProjectSyncWorkerOnce(input: {
 
   const abort = new AbortController();
   let leaseLost = false;
+  const abortFromCaller = () => {
+    leaseLost = true;
+    abort.abort(input.signal?.reason ?? new Error("Project sync worker was cancelled."));
+  };
+  if (input.signal?.aborted) abortFromCaller();
+  else input.signal?.addEventListener("abort", abortFromCaller, { once: true });
   let renewalInFlight: Promise<void> | undefined;
   const renewalMs = Math.max(5_000, Math.floor((leaseSeconds * 1000) / 3));
   const timer = setInterval(() => {
@@ -103,6 +110,7 @@ export async function runProjectSyncWorkerOnce(input: {
     };
   } finally {
     clearInterval(timer);
+    input.signal?.removeEventListener("abort", abortFromCaller);
   }
 
   if (renewalInFlight) await renewalInFlight;
@@ -176,6 +184,7 @@ export async function runProjectSyncWorkerBatch(input: {
       runId: input.runId,
       execute: input.execute,
       leaseSeconds: input.leaseSeconds,
+      signal: input.signal,
     });
     results.push(result);
     if (!result.claimed || result.leaseLost) {
