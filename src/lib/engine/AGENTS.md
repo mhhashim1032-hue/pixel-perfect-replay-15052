@@ -30,3 +30,13 @@
 - Preview lifecycle is separate: task-scoped sandbox, dependency install, dev process readiness, HTTP route probe, browser console/network capture, redacted logs and repeatable diagnosis. A server process starting is not a successful preview; a preview is not a production deployment.
 - Repair in bounded root-cause rounds. Preserve customer data, RLS, auth, migrations and existing provider configuration. Never delete files to suppress errors, fake successful provider responses, disable checks or claim unverified states as healthy.
 - Completion report includes exact repository/branch/commit, customer-selected provider project identifiers (non-sensitive), preview state, deployment state, tests and routes checked, approvals used and unresolved blockers.
+
+## Forge UAF conformance
+- Follow `UAF/constitution.md` and the relevant `UAF/protocols/*` documents for every substantial task. These documents augment this file; existing implementation invariants below remain authoritative where they are more specific.
+- The active agent identity and visible product name are **Forge**. Do not add a separate competing agent runtime or duplicate existing lifecycle, model, memory, skill, team or control-plane services.
+- General-purpose task handling must be domain-aware: coding, research, business, documents, analytics and automation each use relevant skills and appropriate verification.
+- Model independence means capability discovery and normalized provider adapters; never assume a model supports tool calls, vision, JSON schema or a specific reasoning parameter.
+- Tool calls require real schema validation, owner/task permissions, bounded budgets, safe retries and observed postconditions. No narration-only completion.
+- Customer infrastructure sync is a resumable saga across independent provider APIs, not an atomic transaction. Re-read authoritative state after ambiguous write failures, use stable idempotency keys where supported, preserve successful steps and reject stale workers via fencing.
+- Connect and Auto-fix are not consent to production changes. Migrations, production environment writes, domain/permission changes, resource creation/relinking and deploys must remain behind exact existing approval flows. Never let a broad sync option bypass the migration approval UI.
+- A provider sync result must distinguish verified, pending, blocked, failed, skipped and unverified. Never state that all resources are in sync if any required step has not been checked.
