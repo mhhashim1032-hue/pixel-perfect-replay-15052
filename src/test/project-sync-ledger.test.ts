@@ -102,6 +102,11 @@ describe("durable project sync ledger graph validation", () => {
     expect(fingerprintProjectSyncPlan({ a: 1 })).toHaveLength(64);
   });
 
+  it("keeps execution context bounded for provider/resource pinning", () => {
+    const withContext = { ...steps[0]!, executionContext: { providerAccountId: "acct-1", repo: "owner/repo", branch: "forge/work", commitSha: "abc123" } };
+    expect(validateLedgerSteps([withContext])).toBeNull();
+  });
+
   it("requires a bounded input fingerprint", () => {
     expect(validateLedgerSteps([{ ...steps[0]!, inputFingerprint: "" }])).toContain("fingerprint");
     expect(validateLedgerSteps([{ ...steps[0]!, inputFingerprint: "x".repeat(513) }])).toContain("fingerprint");
