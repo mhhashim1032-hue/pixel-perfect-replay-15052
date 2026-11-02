@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runProjectSyncWorkerOnce, safeProjectSyncError } from "@/lib/project-sync-worker.server";
+import { runProjectSyncWorkerBatch, runProjectSyncWorkerOnce, safeProjectSyncError } from "@/lib/project-sync-worker.server";
 
 const lease = {
   id: "step-1",
@@ -75,6 +75,30 @@ describe("durable project sync worker", () => {
     expect(result.stepState).toBe("failed");
     const finish = db.rpc.mock.calls.find(([name]) => name === "project_sync_finish_step");
     expect(finish?.[1]).toMatchObject({ _state: "failed", _retry_at: null });
+  });
+
+  it("runs a bounded batch and stops when no work is claimable", async () => {
+    const db = admin();
+    let claims = 0;
+    db.rpc.mockImplementation(async (name: string) => {
+      if (name === "project_sync_claim_step") {
+        claims += 1;
+        return { data: claims === 1 ? [lease] : [], error: null };
+      }
+      if (name === "project_sync_finalize_run") return { data: "succeeded", error: null };
+      return { data: true, error: null };
+    });
+    const execute = vi.fn(async () => ({ state: "succeeded" as const }));
+    const result = await runProjectSyncWorkerBatch({
+      internalAdmin: db.client,
+      runId: "run-1",
+      execute,
+      maxSteps: 5,
+    });
+    expect(result.processed).toBe(1);
+    expect(result.idle).toBe(true);
+    expect(result.results).toHaveLength(2);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("redacts common credentials from provider errors", () => {
