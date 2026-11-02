@@ -69,8 +69,8 @@ export class DeployLimitError extends Error {
 export class Vercel {
   private token: string;
   private teamId: string | null;
-  constructor(packed: string) { const u = unpackVercelToken(packed); this.token = u.token; this.teamId = u.teamId; }
-  private req<T = any>(p: string, i?: RequestInit) { return call<T>("https://api.vercel.com", this.token, withTeam(p, this.teamId), i); }
+  constructor(packed: string, private signal?: AbortSignal) { const u = unpackVercelToken(packed); this.token = u.token; this.teamId = u.teamId; }
+  private req<T = any>(p: string, i?: RequestInit) { return call<T>("https://api.vercel.com", this.token, withTeam(p, this.teamId), { ...i, signal: i?.signal ?? this.signal }); }
   user() { return this.req("/v2/user"); }
   /** Teams this token may act on; an Apps token whose app has no permissions is refused here. */
   async teams(): Promise<VercelTeam[]> {
