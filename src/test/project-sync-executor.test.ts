@@ -14,7 +14,7 @@ describe("project sync executor allowlist", () => {
 
   it("rejects every provider operation except the explicitly implemented GitHub inspection", async () => {
     const executor = createProjectSyncExecutor({} as never);
-    await expect(executor({
+    const result = await executor({
       id: "step-1",
       run_id: "run-1",
       step_key: "apply_migrations",
@@ -25,6 +25,7 @@ describe("project sync executor allowlist", () => {
       lease_token: "lease",
       lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
       input_fingerprint: "fingerprint",
-    }, { signal: new AbortController().signal })).rejects.toThrow("no enabled provider executor");
+    }, { signal: new AbortController().signal });
+    expect(result).toMatchObject({ state: "failed", safeError: expect.stringContaining("no enabled provider executor") });
   });
 });
