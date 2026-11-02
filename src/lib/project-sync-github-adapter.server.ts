@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { accountToken } from "./accounts.server";
 import { GitHub } from "./github.server";
 
@@ -42,7 +43,7 @@ function assertBranch(value: string): string {
  * No arbitrary URL, repository, branch, shell command or customer write is accepted.
  */
 export async function inspectPinnedGitHubRepository(input: {
-  supabase: any;
+  supabase: SupabaseClient;
   userId: string;
   session: GitHubInspectSession;
   signal?: AbortSignal;
