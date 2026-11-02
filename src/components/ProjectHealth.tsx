@@ -41,7 +41,7 @@ export function ConnectSyncCard({ id, onSend }: { id: string; onSend?: (prompt: 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="font-semibold">Connect & sync</h2>
-          <p className="text-xs text-muted-foreground">Links GitHub, database and Vercel, fixes sign-in links, applies database changes and checks the live site.</p>
+          <p className="text-xs text-muted-foreground">Checks GitHub, database and Vercel connections, flags pending migrations and verifies deployment health. It does not change customer settings or deploy.</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? <Loader2 className="animate-spin" /> : <Link2 />} Sync now</Button>

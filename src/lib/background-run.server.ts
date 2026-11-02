@@ -1,4 +1,5 @@
 import { KEEPER_SCRIPT, readKeeperProbe } from "./background-run";
+import { startRemoteKeeper, stopRemoteKeeper } from "./remote-keeper.server";
 
 const KEEPER_TIMEOUT_MS = 60 * 60_000;
 const ACCEPT_WAIT_MS = 75_000;
@@ -10,6 +11,9 @@ type Result = { ok: true } | { ok: false; status: number; message: string };
  * It never contains the repository, so repo code cannot read the user's session token.
  */
 export async function startKeeper(opts: { sb: any; userId: string; sessionId: string; origin: string; token: string; body: string; recovery?: boolean }): Promise<Result | null> {
+  // Prefer the user's zero-cost Oracle/remote keeper when explicitly configured.
+  // E2B remains an optional compatibility fallback for existing installations.
+  if (process.env["FORGE_KEEPER_URL"]?.trim()) return startRemoteKeeper(opts);
   const apiKey = process.env["E2B_API_KEY"];
   if (!apiKey) return null;
   const { data: before } = await opts.sb.from("agent_sessions").select("execution_id, stop_requested").eq("id", opts.sessionId).eq("user_id", opts.userId).single();
@@ -55,6 +59,10 @@ export async function startKeeper(opts: { sb: any; userId: string; sessionId: st
 
 /** Ends a keeper sandbox once its run finished (best effort; it also expires on its own). */
 export async function stopKeeper(id: string) {
+  if (process.env["FORGE_KEEPER_URL"]?.trim()) {
+    await stopRemoteKeeper(id).catch(() => {});
+    return;
+  }
   const apiKey = process.env["E2B_API_KEY"];
   if (!apiKey) return;
   const { Sandbox } = await import("e2b");

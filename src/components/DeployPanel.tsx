@@ -7,6 +7,7 @@ import { AlertTriangle, Check, Database, ExternalLink, Globe, KeyRound, Loader2,
 import { saveCredential } from "@/lib/app.functions";
 import { deployOAuthStatus, startDeployOAuth } from "@/lib/deploy-oauth.functions";
 import { ConnectSyncCard } from "@/components/ProjectHealth";
+import { ProjectSyncHistory } from "@/components/ProjectSyncHistory";
 import { CustomDomainSetup } from "@/components/CustomDomainSetup";
 import { ProjectSecrets } from "@/components/ProjectSecrets";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ export function DeployPanel({ id, onSend }: { id: string; onSend?: (prompt: stri
 
       <Step n={3} done={false} icon={<Rocket className="h-4 w-4" />} title="Go live" hint={live ? "Database and website are linked together" : "Finish steps 1 and 2 first, or sync what you have"}>
         <ConnectSyncCard id={id} {...(onSend ? { onSend } : {})} />
+        <ProjectSyncHistory id={id} />
       </Step>
 
       {ghOpts.length > 1 && (
