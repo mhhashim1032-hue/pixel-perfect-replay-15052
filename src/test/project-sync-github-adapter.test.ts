@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const accountToken = vi.fn();
-const repoInfo = vi.fn();
-const headSha = vi.fn();
-const tree = vi.fn();
+const mocks = vi.hoisted(() => ({ accountToken: vi.fn(), repoInfo: vi.fn(), headSha: vi.fn(), tree: vi.fn() }));
 
-vi.mock("@/lib/accounts.server", () => ({ accountToken: (...args: unknown[]) => accountToken(...args) }));
+vi.mock("@/lib/accounts.server", () => ({ accountToken: (...args: unknown[]) => mocks.accountToken(...args) }));
 vi.mock("@/lib/github.server", () => ({
   GitHub: class {
-    repoInfo = repoInfo;
-    headSha = headSha;
-    tree = tree;
+    repoInfo = mocks.repoInfo;
+    headSha = mocks.headSha;
+    tree = mocks.tree;
     constructor(_token: string) {}
   },
 }));
@@ -22,10 +19,10 @@ const session = { user_id: "user-1", repo: "owner/repo", work_branch: "forge/wor
 describe("pinned GitHub inspection adapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    accountToken.mockResolvedValue("github-token");
-    repoInfo.mockResolvedValue({ default_branch: "main" });
-    headSha.mockResolvedValue("abc123");
-    tree.mockResolvedValue(["README.md", "src/index.ts"]);
+    mocks.accountToken.mockResolvedValue("github-token");
+    mocks.repoInfo.mockResolvedValue({ default_branch: "main" });
+    mocks.headSha.mockResolvedValue("abc123");
+    mocks.tree.mockResolvedValue(["README.md", "src/index.ts"]);
   });
 
   it("reads only the session-pinned repository and verifies the branch head twice", async () => {
