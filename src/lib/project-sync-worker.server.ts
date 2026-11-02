@@ -58,8 +58,8 @@ export async function runProjectSyncWorkerOnce(input: {
   internalAdmin: SupabaseClient;
   runId: string;
   execute: ProjectSyncExecutor;
-  leaseSeconds?: number;
-  signal?: AbortSignal;
+  leaseSeconds?: number | undefined;
+  signal?: AbortSignal | undefined;
 }): Promise<ProjectSyncWorkerResult> {
   const leaseSeconds = Math.max(15, Math.min(900, Math.floor(input.leaseSeconds ?? 90)));
   const lease = await claimProjectSyncStep(input.internalAdmin, input.runId, leaseSeconds);
