@@ -144,3 +144,45 @@ export async function runProjectSyncWorkerOnce(input: {
   const runState = await finalizeProjectSyncRun(input.internalAdmin, input.runId);
   return { claimed: true, stepId: lease.id, stepState: state, runState };
 }
+
+export type ProjectSyncWorkerBatchResult = {
+  processed: number;
+  idle: boolean;
+  results: ProjectSyncWorkerResult[];
+};
+
+/**
+ * Bounded sequential worker loop suitable for a scheduled runner or a short-lived
+ * server invocation. It stops on idle/approval/retry wait and never spins forever.
+ */
+export async function runProjectSyncWorkerBatch(input: {
+  internalAdmin: SupabaseClient;
+  runId: string;
+  execute: ProjectSyncExecutor;
+  maxSteps?: number;
+  leaseSeconds?: number;
+  signal?: AbortSignal;
+}): Promise<ProjectSyncWorkerBatchResult> {
+  const maxSteps = Math.max(1, Math.min(50, Math.floor(input.maxSteps ?? 10)));
+  const results: ProjectSyncWorkerResult[] = [];
+  let idle = false;
+
+  while (results.length < maxSteps) {
+    if (input.signal?.aborted) {
+      throw input.signal.reason ?? new Error("Project sync worker batch was cancelled.");
+    }
+    const result = await runProjectSyncWorkerOnce({
+      internalAdmin: input.internalAdmin,
+      runId: input.runId,
+      execute: input.execute,
+      leaseSeconds: input.leaseSeconds,
+    });
+    results.push(result);
+    if (!result.claimed || result.leaseLost) {
+      idle = !result.leaseLost;
+      break;
+    }
+  }
+
+  return { processed: results.filter((result) => result.claimed).length, idle, results };
+}
