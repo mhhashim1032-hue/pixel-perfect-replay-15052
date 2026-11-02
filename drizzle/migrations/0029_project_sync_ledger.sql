@@ -157,7 +157,7 @@ BEGIN
         last_error = CASE WHEN _state = 'retryable' AND attempt >= max_attempts THEN coalesce(left(_safe_error, 500), 'Retry limit reached') ELSE left(_safe_error, 500) END,
         next_retry_at = CASE WHEN _state = 'retryable' AND attempt < max_attempts THEN _retry_at ELSE NULL END,
         lease_token = NULL, lease_expires_at = NULL, updated_at = now()
-    WHERE id = _step AND state = 'leased' AND lease_token = _lease_token;
+    WHERE id = _step AND state = 'leased' AND lease_token = _lease_token AND lease_expires_at > now();
   RETURN FOUND;
 END;
 $$;
