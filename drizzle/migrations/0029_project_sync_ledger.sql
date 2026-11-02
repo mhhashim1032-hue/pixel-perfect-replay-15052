@@ -82,3 +82,85 @@ GRANT USAGE, SELECT ON SEQUENCE public.project_sync_events_id_seq TO service_rol
 COMMENT ON TABLE public.project_sync_runs IS 'Durable, idempotent project sync runs in Forge internal DB; not customer Supabase.';
 COMMENT ON TABLE public.project_sync_steps IS 'Per-operation sync ledger with leases and fencing tokens for safe retries.';
 COMMENT ON TABLE public.project_sync_events IS 'Deduplicated append-only sync event journal.';
+
+-- Atomic worker claim: SKIP LOCKED prevents two workers from claiming the same step.
+-- A fresh lease token fences out late results from an expired/replaced worker.
+CREATE OR REPLACE FUNCTION public.project_sync_claim_step(_run uuid, _lease_seconds integer DEFAULT 90)
+RETURNS SETOF public.project_sync_steps
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE claimed public.project_sync_steps;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+  IF _lease_seconds < 15 OR _lease_seconds > 900 THEN
+    RAISE EXCEPTION 'lease duration out of range' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.project_sync_runs SET status = 'running', started_at = coalesce(started_at, now()), updated_at = now()
+    WHERE id = _run AND status IN ('queued','running');
+  IF NOT FOUND THEN RETURN; END IF;
+  WITH candidate AS (
+    SELECT id FROM public.project_sync_steps
+    WHERE run_id = _run AND attempt < max_attempts
+      AND ((state IN ('queued','retryable') AND coalesce(next_retry_at, now()) <= now())
+        OR (state = 'leased' AND lease_expires_at <= now()))
+    ORDER BY created_at, id
+    FOR UPDATE SKIP LOCKED
+    LIMIT 1
+  )
+  UPDATE public.project_sync_steps s
+    SET state = 'leased', attempt = s.attempt + 1,
+        lease_token = gen_random_uuid(),
+        lease_expires_at = now() + make_interval(secs => _lease_seconds),
+        next_retry_at = NULL, updated_at = now()
+    FROM candidate c WHERE s.id = c.id
+    RETURNING s.* INTO claimed;
+  IF FOUND THEN RETURN NEXT claimed; END IF;
+  RETURN;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.project_sync_finish_step(
+  _step uuid, _lease_token uuid, _state text,
+  _output_fingerprint text DEFAULT NULL, _safe_error text DEFAULT NULL,
+  _retry_at timestamptz DEFAULT NULL
+) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+  IF _state NOT IN ('succeeded','skipped','retryable','failed','cancelled') THEN
+    RAISE EXCEPTION 'invalid terminal step state' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.project_sync_steps
+    SET state = _state, output_fingerprint = _output_fingerprint,
+        last_error = left(_safe_error, 500), next_retry_at = CASE WHEN _state = 'retryable' THEN _retry_at ELSE NULL END,
+        lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+    WHERE id = _step AND state = 'leased' AND lease_token = _lease_token;
+  RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.project_sync_append_event(
+  _run uuid, _idempotency_key text, _event_type text, _payload jsonb DEFAULT '{}'::jsonb
+) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
+  END IF;
+  INSERT INTO public.project_sync_events(run_id, idempotency_key, event_type, payload)
+    SELECT _run, _idempotency_key, _event_type, coalesce(_payload, '{}'::jsonb)
+    WHERE EXISTS (SELECT 1 FROM public.project_sync_runs WHERE id = _run)
+    ON CONFLICT (run_id, idempotency_key) DO NOTHING;
+  RETURN FOUND;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.project_sync_claim_step(uuid, integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.project_sync_finish_step(uuid, uuid, text, text, text, timestamptz) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.project_sync_append_event(uuid, text, text, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.project_sync_claim_step(uuid, integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.project_sync_finish_step(uuid, uuid, text, text, text, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION public.project_sync_append_event(uuid, text, text, jsonb) TO service_role;
