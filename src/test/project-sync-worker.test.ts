@@ -16,7 +16,7 @@ const lease = {
 
 function admin(claimed = true) {
   const calls: string[] = [];
-  const rpc = vi.fn(async (name: string) => {
+  const rpc = vi.fn(async (name: string, _args?: Record<string, unknown>) => {
     calls.push(name);
     if (name === "project_sync_claim_step") return { data: claimed ? [lease] : [], error: null };
     if (name === "project_sync_finalize_run") return { data: "succeeded", error: null };
@@ -62,7 +62,7 @@ describe("durable project sync worker", () => {
   it("does not retry after the attempt budget is exhausted", async () => {
     const db = admin();
     const exhausted = { ...lease, attempt: 3, max_attempts: 3 };
-    db.rpc.mockImplementation(async (name: string) => {
+    db.rpc.mockImplementation(async (name: string, _args?: Record<string, unknown>) => {
       if (name === "project_sync_claim_step") return { data: [exhausted], error: null };
       if (name === "project_sync_finalize_run") return { data: "failed", error: null };
       return { data: true, error: null };
