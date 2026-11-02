@@ -10,7 +10,7 @@ This guide separates three different jobs:
 
 | Use | First choice | Free allowance / limitation | Fit |
 |---|---|---|---|
-| Persistent VPS | Oracle Cloud Always Free Ampere A1 | Up to 2 OCPU + 12 GB RAM equivalent, 1,500 OCPU-hours and 9,000 GB-hours monthly; home-region capacity is not guaranteed and signup requires card verification | Best candidate for a persistent worker host |
+| Persistent VPS | Oracle Cloud Always Free Ampere A1 | Up to 4 OCPU + 24 GB RAM equivalent, 3,000 OCPU-hours and 18,000 GB-hours monthly; home-region capacity is not guaranteed and signup requires card verification | Best candidate for a persistent worker host |
 | Short CI jobs | GitHub Actions | Free account currently includes 2,000 hosted minutes/month for private repos; standard hosted runner usage is free for public repos | Best for tests/builds, not a continuously running coding agent |
 | Browser IDE / CPU | Lightning AI Free Studio | One free CPU Studio, with a 4-hour session limit/restart; persistent workspace/storage allowances apply | Good for remote development, not a guaranteed uninterrupted worker |
 | GPU experiments | Kaggle Notebooks | Typically up to 30 GPU hours/week, quota/capacity dependent; notebook sessions are limited | GPU experiments only |
@@ -49,7 +49,7 @@ The account is already available, so skip account registration. Do not upgrade t
 
 1. Create one OCI Free Tier account using accurate billing/identity details. Oracle requires a supported credit/debit card for verification; this is not a no-card offer.
 2. Select the home region carefully. Always Free compute must be provisioned in that home region.
-3. Create an Ubuntu 24.04 ARM64 Ampere A1 VM. Stay within the total Always Free allowance: 2 OCPUs and 12 GB RAM. Use a 50 GB boot volume and keep all volumes within the free 200 GB combined block-volume limit.
+3. Create an Ubuntu 24.04 ARM64 Ampere A1 VM. Stay within the total Always Free allowance: up to 4 OCPUs and 24 GB RAM. A 2 OCPU / 12 GB starting shape is sufficient for the first Forge worker. Use a 50 GB boot volume and keep all volumes within the free 200 GB combined block-volume limit.
 4. If the console reports `Out of host capacity`, try another availability domain if available or retry later. Do not upgrade to paid just to get capacity if your budget is zero.
 5. Add an SSH key, allow SSH only, and connect from your phone using an SSH client.
 6. Review this repo's `ops/free-cloud/oci-bootstrap.sh`, then run it on the new VM. It installs general host prerequisites and hardens basic access; it does not expose an app port or open a public service.
