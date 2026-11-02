@@ -39,4 +39,10 @@ describe("connect & sync rules", () => {
     expect(autoFixPrompt([{ key: "a", label: "A", state: "ok", note: "" }], [])).toBeNull();
     expect(autoFixPrompt([{ key: "b", label: "Build", state: "fail", note: "ERROR" }], ["x"])).toContain("Build: ERROR");
   });
+  it("Auto-fix never claims customer infrastructure was already changed", () => {
+    const prompt = autoFixPrompt([{ key: "database", label: "Database settings", state: "warn", note: "Pending approval" }], []);
+    expect(prompt).toContain("without changing customer infrastructure");
+    expect(prompt).toContain("never write customer environment/auth settings");
+    expect(prompt).toContain("migrations remain pending explicit review and approval");
+  });
 });
