@@ -24,8 +24,8 @@ export const syncProject = createServerFn({ method: "POST" })
   });
 
 /**
- * Auto-fix may inspect and reconcile through the task's configured autonomy. Migrations remain
- * blocked here because approval must be bound to the exact reviewed migration set in Deploy.
+ * Auto-fix uses read-only provider diagnostics and returns a focused source-repair brief.
+ * Customer settings, migrations, domains and production deployments remain separate approval flows.
  */
 export const autoFix = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -44,7 +44,7 @@ export const autoFix = createServerFn({ method: "POST" })
       prompt: prompt ? [
         prompt,
         "",
-        "Forge operating contract: inspect the active task's pinned customer accounts and resource IDs before every provider operation. Never use another account or platform credentials. Do not run or approve migrations from Auto-fix; use the exact migration approval workflow. Do not write customer environment values, change domains or deploy unless permitted by the task's autonomy and explicit approval flow. Verify actual postconditions; report partial sync honestly."
+        "Forge operating contract: inspect the active task's pinned customer accounts and resource IDs before every provider operation. Never use another account or platform credentials. Do not run or approve migrations from Auto-fix; use the exact migration approval workflow. Do not write customer environment values, change Supabase Auth or redirect settings, change domains, apply migrations or deploy from Auto-fix; these require separate customer approval flows. Verify actual postconditions; report partial sync honestly."
       ].join("\n") : null,
       deploymentAllowed: deployAllowed(level)
     };
