@@ -27,7 +27,7 @@ export function HealthList({ steps }: { steps: SyncStep[] }) {
   );
 }
 
-/** "Connect & sync" card for the Deploy tab: one tap wires everything and shows a checklist. */
+/** Read-only resource health card for the Deploy tab. */
 export function ConnectSyncCard({ id, onSend }: { id: string; onSend?: (prompt: string) => void }) {
   const [steps, setSteps] = useState<SyncStep[] | null>(null);
   const sync = useServerFn(syncProject);
@@ -40,11 +40,11 @@ export function ConnectSyncCard({ id, onSend }: { id: string; onSend?: (prompt: 
     <section className="min-w-0 rounded-lg border border-primary/30 bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="font-semibold">Connect & sync</h2>
+          <h2 className="font-semibold">Resource health checks</h2>
           <p className="text-xs text-muted-foreground">Checks GitHub, database and Vercel connections, flags pending migrations and verifies deployment health. It does not change customer settings or deploy.</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? <Loader2 className="animate-spin" /> : <Link2 />} Sync now</Button>
+          <Button size="sm" variant="secondary" onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? <Loader2 className="animate-spin" /> : <Link2 />} Check now</Button>
           {onSend && <AutoFixButton id={id} onSend={onSend} onSteps={setSteps} />}
         </div>
       </div>
@@ -67,7 +67,7 @@ export function AutoFixButton({ id, onSend, onSteps, compact, disabled }: { id: 
     onError: (e: Error) => toast.error(e.message),
   });
   return (
-    <Button size="sm" onClick={() => m.mutate()} disabled={disabled || m.isPending} title="Sync everything and fix build, deploy and sign-in problems">
+    <Button size="sm" onClick={() => m.mutate()} disabled={disabled || m.isPending} title="Run read-only checks and ask Forge to address verified blockers; approval may be required.">
       {m.isPending ? <Loader2 className="animate-spin" /> : <Wand2 />}{compact ? null : " Auto-fix"}
     </Button>
   );
