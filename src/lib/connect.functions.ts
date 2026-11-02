@@ -89,6 +89,6 @@ export const getProjectSyncHistory = createServerFn({ method: "POST" })
       internalAdmin: getInternalLedgerAdmin(),
       userId: context.userId,
       sessionId: data.id,
-      page: data.page,
+      page: data.page ?? 0,
     });
   });
