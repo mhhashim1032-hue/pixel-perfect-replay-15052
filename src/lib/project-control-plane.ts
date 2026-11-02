@@ -1,7 +1,9 @@
 /** Pure planning contracts for the customer-project control plane.
- * This module must not perform provider I/O or resolve credentials.
+ * This module never performs provider I/O or resolves credentials.
+ *
+ * Sync is a saga across three independent customer-owned providers, not an atomic
+ * transaction. A dry-run plan is deterministic; execution is a separate, authorized step.
  */
-
 export const CONTROL_PLANE_PROVIDERS = ["github", "supabase", "vercel"] as const;
 export type ControlPlaneProvider = (typeof CONTROL_PLANE_PROVIDERS)[number];
 export type ResourceMode = "connect_existing" | "create_new";
@@ -30,6 +32,11 @@ export type SyncPlanInput = {
   hasCommit: boolean;
   pendingMigrations: number;
   approvedOperations?: SyncOperation[];
+  /** Explicit run-time capability; approval never substitutes for this capability. */
+  allowProductionDeployment?: boolean;
+  /** Must match the immutable plan/resource/commit approval the user accepted. */
+  approvalBinding?: string | null;
+  currentPlanBinding?: string | null;
 };
 
 export type PlannedSyncStep = {
@@ -71,7 +78,18 @@ const DEPENDENCIES: Record<SyncOperation, SyncOperation[]> = {
   verify_runtime: ["deploy_exact_commit"],
 };
 
-const APPROVAL_REQUIRED = new Set<SyncOperation>(["apply_migrations"]);
+const APPROVAL_REQUIRED = new Set<SyncOperation>(["apply_migrations", "deploy_exact_commit"]);
+const TOP_LEVEL_ORDER: SyncOperation[] = [
+  "inspect_repository",
+  "verify_database_binding",
+  "verify_deployment_binding",
+  "sync_environment",
+  "sync_auth_redirects",
+  "inspect_migrations",
+  "apply_migrations",
+  "deploy_exact_commit",
+  "verify_runtime",
+];
 
 function readinessReason(input: SyncPlanInput, operation: SyncOperation): string | null {
   const provider = PROVIDER_FOR[operation];
@@ -79,42 +97,28 @@ function readinessReason(input: SyncPlanInput, operation: SyncOperation): string
   const status = input.providers[provider];
   if (!status.connected) return `Connect the customer's ${provider} account.`;
   if (!status.accountPinned) return `Select and pin the customer's ${provider} account for this project.`;
-  if (provider === "github" && !status.resourceSelected) return "Select the GitHub repository for this project.";
-  if (provider === "supabase" && !status.resourceSelected) return "Select the Supabase project for this project.";
-  if (provider === "vercel" && !status.resourceSelected) return "Select the Vercel project for this project.";
+  if (!status.resourceSelected) return `Select the customer's ${provider} resource for this project.`;
   return null;
 }
 
-function topologicalOrder(): SyncOperation[] {
-  return [
-    "inspect_repository",
-    "verify_database_binding",
-    "verify_deployment_binding",
-    "sync_environment",
-    "sync_auth_redirects",
-    "inspect_migrations",
-    "apply_migrations",
-    "deploy_exact_commit",
-    "verify_runtime",
-  ];
+function isOptional(input: SyncPlanInput, operation: SyncOperation): boolean {
+  return operation === "verify_database_binding" && !input.hasDatabase
+    || operation === "verify_deployment_binding" && !input.hasDeployment
+    || ["sync_environment", "sync_auth_redirects", "inspect_migrations", "apply_migrations"].includes(operation) && !input.hasDatabase
+    || ["sync_environment", "sync_auth_redirects", "deploy_exact_commit", "verify_runtime"].includes(operation) && !input.hasDeployment
+    || operation === "deploy_exact_commit" && !input.hasCommit
+    || operation === "apply_migrations" && input.pendingMigrations === 0;
 }
 
 /** Creates a deterministic dry-run plan. It never performs provider calls or external writes. */
 export function buildProjectSyncPlan(input: SyncPlanInput): ProjectSyncPlan {
-  const operations = topologicalOrder();
   const completed = new Set<SyncOperation>();
   const steps: PlannedSyncStep[] = [];
   const approved = new Set(input.approvedOperations ?? []);
+  const bindingMatches = !!input.approvalBinding && input.approvalBinding === input.currentPlanBinding;
 
-  for (const operation of operations) {
-    const optional = operation === "verify_database_binding" && !input.hasDatabase
-      || operation === "verify_deployment_binding" && !input.hasDeployment
-      || ["sync_environment", "sync_auth_redirects", "inspect_migrations", "apply_migrations"].includes(operation) && !input.hasDatabase
-      || ["sync_environment", "sync_auth_redirects", "deploy_exact_commit", "verify_runtime"].includes(operation) && !input.hasDeployment
-      || operation === "deploy_exact_commit" && !input.hasCommit
-      || operation === "apply_migrations" && input.pendingMigrations === 0;
-
-    if (optional) {
+  for (const operation of TOP_LEVEL_ORDER) {
+    if (isOptional(input, operation)) {
       steps.push({ operation, dependsOn: DEPENDENCIES[operation], state: "not_applicable", reason: "This resource or change is not part of the selected project sync.", requiresApproval: false });
       continue;
     }
@@ -131,20 +135,47 @@ export function buildProjectSyncPlan(input: SyncPlanInput): ProjectSyncPlan {
       continue;
     }
 
-    if (APPROVAL_REQUIRED.has(operation) && !approved.has(operation)) {
-      steps.push({ operation, dependsOn: DEPENDENCIES[operation], state: "approval_required", reason: "Production database changes require explicit customer approval.", requiresApproval: true });
-      continue;
+    if (APPROVAL_REQUIRED.has(operation)) {
+      if (!input.allowProductionDeployment && operation === "deploy_exact_commit") {
+        steps.push({ operation, dependsOn: DEPENDENCIES[operation], state: "blocked", reason: "The task's current autonomy/permission policy does not permit production deployment.", requiresApproval: false });
+        continue;
+      }
+      const requiresExactApproval = operation === "apply_migrations" || operation === "deploy_exact_commit";
+      if (requiresExactApproval && (!approved.has(operation) || !bindingMatches)) {
+        steps.push({
+          operation, dependsOn: DEPENDENCIES[operation], state: "approval_required",
+          reason: bindingMatches
+            ? "Explicit approval for this exact operation is required."
+            : "Approval must be bound to the current resource, commit and plan; review the current plan.",
+          requiresApproval: true,
+        });
+        continue;
+      }
     }
 
-    steps.push({ operation, dependsOn: DEPENDENCIES[operation], state: "ready", reason: "All prerequisites and account checks are satisfied.", requiresApproval: false });
+    steps.push({ operation, dependsOn: DEPENDENCIES[operation], state: "ready", reason: "All prerequisites, pinned customer resources and policy checks are satisfied.", requiresApproval: false });
     completed.add(operation);
   }
 
   const requiresApproval = steps.filter((step) => step.state === "approval_required").map((step) => step.operation);
+  const hasBlocked = steps.some((step) => step.state === "blocked");
+  const hasApproval = requiresApproval.length > 0;
   return {
     mode: input.mode ?? "connect_existing",
     steps,
-    canStart: steps.some((step) => step.state === "ready") && !steps.some((step) => step.state === "blocked"),
+    canStart: steps.some((step) => step.state === "ready") && !hasBlocked && !hasApproval,
     requiresApproval,
   };
+}
+
+/** Stable canonical JSON for hashing a dry-run plan before approval. */
+export function stablePlanBinding(value: unknown): string {
+  const normalize = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(normalize);
+    if (v && typeof v === "object") {
+      return Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, normalize(x)]));
+    }
+    return v;
+  };
+  return JSON.stringify(normalize(value));
 }
