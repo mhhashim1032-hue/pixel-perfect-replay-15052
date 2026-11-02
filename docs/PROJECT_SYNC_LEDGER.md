@@ -44,6 +44,21 @@ The worker must remain disabled until both dedicated variables point to Forge's 
 internal database and migration 0029 has been reviewed and applied there. This change
 does not configure those secrets or enable a worker automatically.
 
+## Worker loop
+
+`src/lib/project-sync-worker.server.ts` adds a single-step worker primitive. It claims
+only a dependency-ready step, renews its lease while the executor is active, aborts the
+executor if the lease is lost, fences completion, applies bounded exponential retry
+backoff, redacts error summaries, appends an idempotent event and finalizes the run.
+
+The worker is deliberately executor-injected. It does not contain provider credentials
+or pretend to implement GitHub/Supabase/Vercel writes. Only trusted server-side adapters
+may be supplied as the executor, and each adapter must honor `AbortSignal`, verify
+task-pinned resource IDs and make provider writes idempotent. Lease fencing protects the
+ledger from stale workers; it cannot undo a provider side effect already accepted by an
+external API. The application does not expose a public worker endpoint or start a
+polling daemon yet.
+
 ## RPC contracts
 
 - `project_sync_create_run(...)`: atomically creates an idempotent run and immutable step graph.
@@ -60,11 +75,11 @@ does not configure those secrets or enable a worker automatically.
 
 ## Integration status and safety boundary
 
-The ledger and its typed adapter are committed, but **the application does not yet launch
-background sync workers from Connect or Auto-fix**. Those existing paths remain read-only.
-The next integration step is to construct the internal admin client safely, create runs
-from an approved plan, run a worker loop with lease renewal and bounded retries, perform
-provider read-back verification, and expose user-visible run/step history.
+The ledger, typed adapter and generic worker primitive are committed, but **the application
+does not yet launch background sync workers from Connect or Auto-fix**. Those existing
+paths remain read-only. Remaining integration includes approved-plan run creation,
+trusted provider adapters, a secured trigger/scheduler, provider read-back verification,
+and user-visible run/step history.
 
 Customer migration, environment, auth, domain, and deployment operations remain separate
 explicit approvals bound to the current customer resource, commit, and plan. Do not call
