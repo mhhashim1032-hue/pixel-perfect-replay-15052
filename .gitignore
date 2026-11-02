@@ -36,3 +36,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local, consent-gated model training artifacts
+/approved-examples.jsonl
+/forge-sft-prepared.jsonl
+/candidate-observations.json
+/forge-lora-adapter/
+/ops/training/private-data/
+/ops/training/output/
+/ops/training/adapters/

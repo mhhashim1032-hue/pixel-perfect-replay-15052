@@ -1,0 +1,7 @@
+# Install a CUDA-compatible PyTorch build separately for your notebook/driver.
+# These packages provide the optional LoRA training pipeline.
+transformers>=4.46,<5
+datasets>=3.1,<5
+peft>=0.14,<1
+accelerate>=1.0,<2
+bitsandbytes>=0.45,<1

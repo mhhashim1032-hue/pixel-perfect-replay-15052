@@ -21,7 +21,9 @@ UAF is Forge's model-independent operating framework. Forge remains the working 
 - `protocols/`: task, tool, sync, recovery and verification contracts.
 - `.agents/skills/`: repository-facing Forge skill definitions; `src/lib/free-skills.ts` registers the runtime skills used by the live agent.
 - `schemas/`: portable JSON schemas.
-- `evaluations/`: model-agnostic behavioral test cases and scoring.
+- `evaluations/`: 20 model-agnostic behavioral cases, weighted scoring and critical hard gates.
+- `src/lib/engine/evaluation.ts` and `scripts/evaluate-uaf.ts`: offline scoring of reviewed model observations; catalog validation never calls a model.
+- `ops/training/`: opt-in, consent-gated dataset preparation and optional open-weight LoRA training; no app conversations or customer repositories are collected automatically.
 
 ## Integration strategy
 UAF augments the current Forge engine; it does not replace the Vercel AI SDK, provider adapters, MCP, engine lifecycle, E2B sandbox, BYOK credential system, Supabase schema, or customer control-plane. Existing engine modules remain authoritative for their respective lifecycle, authorization and execution contracts.
