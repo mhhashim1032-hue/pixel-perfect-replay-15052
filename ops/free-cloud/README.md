@@ -35,7 +35,7 @@ The account is already available, so skip account registration. Do not upgrade t
 
 1. Open OCI Console and confirm the account's **home region** and Free Tier status.
 2. Open **Compute → Instances → Create instance**. Choose Ubuntu 24.04 ARM64 and VM.Standard.A1.Flex (Ampere A1).
-3. Keep the total shape allocation within the Always Free limit: at most 4 OCPUs and 24 GB memory in the current A1 free allowance, subject to available capacity and the account's eligibility. For Forge's first worker, start smaller: 2 OCPUs and 12 GB RAM.
+3. Keep the total shape allocation within the Always Free limit: at most 4 OCPUs and 24 GB memory in the current A1 free allowance, subject to available capacity and the account's eligibility. For Forge's first worker, start smaller: 2 OCPUs and 12 GB RAM. Recommended starting shape: 2 OCPU + 12 GB RAM.
 4. Use a 50 GB boot volume initially. Keep all boot and block volumes within the account's Always Free storage quota.
 5. Assign a public IPv4 address if available. Add an SSH public key during instance creation; keep the private key only on your device.
 6. In the VCN security list or Network Security Group, allow inbound TCP 22 only from your current public IP where practical. Do not open 3000, 3001, 5432, 8080 or any worker port to the internet.
