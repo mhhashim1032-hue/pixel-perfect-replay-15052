@@ -33,7 +33,7 @@ export function ConnectSyncCard({ id, onSend }: { id: string; onSend?: (prompt: 
   const sync = useServerFn(syncProject);
   const m = useMutation({
     mutationFn: () => sync({ data: { id } }),
-    onSuccess: (r) => { setSteps(r.steps); r.overall === "ok" ? toast.success("Everything is connected and in sync") : toast.message("Synced — see what still needs attention"); },
+    onSuccess: (r) => { setSteps(r.steps); if (r.overall === "ok") toast.success("Everything is connected and in sync"); else toast.message("Synced — see what still needs attention"); },
     onError: (e: Error) => toast.error(e.message),
   });
   return (
