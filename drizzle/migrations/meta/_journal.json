@@ -204,6 +204,13 @@
       "when": 1793592085188,
       "tag": "0028_team_api_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793630000000,
+      "tag": "0029_project_sync_ledger",
+      "breakpoints": true
     }
   ]
 }
