@@ -43,7 +43,7 @@ export function effectiveProfile(p: string | null | undefined, c: TaskClass): Ef
 }
 
 /** Provider-specific options. Returns {} whenever support is not documented for this adapter+model. */
-export function reasoningOptions(provider: string, model: string, profile: Effective): { providerOptions?: Record<string, Record<string, unknown>>; applied: string } {
+export function reasoningOptions(provider: string, model: string, profile: Effective): { providerOptions?: Record<string, Record<string, any>>; applied: string } {
   const caps = modelCaps(model);
   if (!caps.known || !caps.reasoning) return { applied: caps.known ? "model has no reasoning controls" : "unknown model — no reasoning fields sent" };
   if (provider === "openai" && /^(gpt-5|o\d)/i.test(model)) {
