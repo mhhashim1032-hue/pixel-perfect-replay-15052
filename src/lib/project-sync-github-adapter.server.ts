@@ -30,7 +30,7 @@ function assertRepository(value: string): string {
 function assertBranch(value: string): string {
   const branch = value.trim();
   if (!branch || branch.length > 240 || branch.startsWith("-") || branch.includes("..") ||
-      branch.includes("@{") || /[\s~^:?*\[\\]/.test(branch) || branch.endsWith("/") || branch.endsWith(".") ||
+      branch.includes("@{") || branch.split("").some((character) => " ~^:?*[]\\\\".includes(character)) || branch.endsWith("/") || branch.endsWith(".") ||
       branch.split("/").some((part) => !part || part.startsWith(".") || part.endsWith(".lock"))) {
     throw new Error("The project's pinned GitHub branch is invalid.");
   }
