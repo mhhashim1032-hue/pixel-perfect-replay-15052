@@ -79,6 +79,6 @@ describe("durable project sync worker", () => {
 
   it("redacts common credentials from provider errors", () => {
     expect(safeProjectSyncError(new Error("Bearer abc.def sk_live_12345678 api_key=secret-value")))
-      .toBe("Bearer [REDACTED] [REDACTED_KEY] [REDACTED]=[REDACTED]");
+      .toBe("Bearer [REDACTED] [REDACTED_KEY] api_key=[REDACTED]");
   });
 });
