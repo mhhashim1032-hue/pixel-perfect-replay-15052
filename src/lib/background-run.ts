@@ -29,3 +29,8 @@ export function readKeeperProbe(raw: string): KeeperProbe {
   if (done.trim()) return { accepted: false, status: 502, message: "Forge could not reach itself from the cloud keeper. Try again." };
   return null;
 }
+
+/** E2B is opt-in for deployments that want to avoid accidental paid keeper usage. */
+export function isE2BKeeperEnabled(env: Record<string, string | undefined>): boolean {
+  return env["FORGE_DISABLE_E2B_KEEPER"] !== "true";
+}

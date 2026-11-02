@@ -22,12 +22,12 @@ Always re-check provider terms before provisioning; free tiers and eligibility c
 ## Architecture for Forge
 
 - Keep Forge's own internal ledger in a dedicated internal Supabase project (the new internal credential factory enforces this).
-- Run the durable worker on a persistent host such as OCI A1 when available.
+- Use OCI A1 as an optional remote stream keeper so agent runs can continue after the phone disconnects; the bounded project-sync queue is dispatched by the app's existing scheduled job route.
 - Keep customer GitHub/Supabase/Vercel connections pinned per task. The worker must never use customer credentials as its own ledger credentials.
 - Use GitHub-hosted Actions for ordinary CI when possible. Do not route untrusted pull-request code to a persistent self-hosted runner.
 - Use a GPU only for local inference/training. When the model is called through an API, the model provider supplies the GPU; Forge's worker mostly needs CPU, RAM, disk and network.
 
-**Current implementation status:** this repository now has the ledger schema, typed ledger adapter, dedicated internal-ledger client, and a one-step worker loop with lease renewal, fencing, retries and redacted events. Read-only GitHub/Supabase/Vercel execution adapters and a secret-protected bounded worker trigger now exist. The trigger is not scheduled or deployed; authenticated history APIs are being added, while the history UI, health/monitoring and production isolation remain future work. The bootstrap script below only prepares an Ubuntu host; it does not deploy Forge, configure secrets, apply migrations or enable a worker.
+**Current implementation status:** this repository has the ledger schema, typed ledger adapter, dedicated internal-ledger client, one-step worker loop with lease renewal/fencing/retries, read-only GitHub/Supabase/Vercel adapters, authenticated launch/history APIs, a Deploy-panel history UI, and bounded dispatch from the existing scheduled job route. An optional Oracle keeper relay and installer are also included in `ops/oci-keeper/`; they are code only until you provision the VM, configure Cloudflare Tunnel and set the server-only app secrets. The project-sync worker remains disabled until the internal ledger migration and dedicated internal credentials are installed. The general bootstrap script below only prepares an Ubuntu host.
 
 ## Oracle account is ready: next steps
 
@@ -41,7 +41,7 @@ The account is already available, so skip account registration. Do not upgrade t
 6. In the VCN security list or Network Security Group, allow inbound TCP 22 only from your current public IP where practical. Do not open 3000, 3001, 5432, 8080 or any worker port to the internet.
 7. Create the instance and wait for its public IP and SSH connection details. If A1 capacity is unavailable, do not select a paid shape; retry later or use a smaller eligible shape.
 8. Connect over SSH from your phone, verify Ubuntu/architecture and disk/memory, then review and run the bootstrap script below.
-9. Stop here after host preparation. Do not add production secrets, apply migration 0029, clone/run arbitrary customer repositories, or start the worker until the isolation and deployment steps are reviewed.
+9. After host preparation, follow `ops/oci-keeper/README.md` only if you want the optional background stream relay. Do not open inbound worker ports. Do not apply migration 0029 to a customer database; it belongs only in Forge's own internal database.
 
 **No credentials needed in chat:** never send the OCI password, private SSH key, API signing key, Supabase service-role key, GitHub PAT or Vercel token here. You can share non-secret instance details such as shape, OS, region, public IP (if comfortable), and whether SSH works.
 
@@ -53,7 +53,8 @@ The account is already available, so skip account registration. Do not upgrade t
 4. If the console reports `Out of host capacity`, try another availability domain if available or retry later. Do not upgrade to paid just to get capacity if your budget is zero.
 5. Add an SSH key, allow SSH only, and connect from your phone using an SSH client.
 6. Review this repo's `ops/free-cloud/oci-bootstrap.sh`, then run it on the new VM. It installs general host prerequisites and hardens basic access; it does not expose an app port or open a public service.
-7. Do not paste GitHub PATs, Supabase service-role keys, Vercel tokens or model API keys into shell history or this repository. Use a secret manager or protected runtime environment after the worker design is complete.
+7. For the optional background stream relay, follow `ops/oci-keeper/README.md`. It uses Cloudflare Tunnel to keep the VM's inbound ports closed; the separate installer binds the keeper to localhost only.
+8. Do not paste GitHub PATs, Supabase service-role keys, Vercel tokens or model API keys into shell history or this repository. Use protected server-only environment settings.
 
 ## Lightning AI for browser-based coding and GPU trials
 
