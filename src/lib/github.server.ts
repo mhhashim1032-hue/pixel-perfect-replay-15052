@@ -2,11 +2,12 @@ import { b64ToUtf8, utf8ToB64 } from "./crypto.server";
 import { commitSafely } from "./branch-write-queue";
 
 export class GitHub {
-  constructor(private token: string) {}
+  constructor(private token: string, private signal?: AbortSignal) {}
 
   async req<T = any>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(`https://api.github.com/${path}`, {
       ...init,
+      signal: init.signal ?? this.signal,
       headers: {
         Accept: "application/vnd.github+json",
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
