@@ -109,6 +109,7 @@ function isOptional(input: SyncPlanInput, operation: SyncOperation): boolean {
     || ["sync_environment", "sync_auth_redirects", "inspect_migrations", "apply_migrations"].includes(operation) && !input.hasDatabase
     || ["sync_environment", "sync_auth_redirects", "deploy_exact_commit", "verify_runtime"].includes(operation) && !input.hasDeployment
     || operation === "deploy_exact_commit" && !input.hasCommit
+    || operation === "verify_runtime" && !input.hasCommit
     || operation === "apply_migrations" && input.pendingMigrations === 0;
 }
 
@@ -122,6 +123,7 @@ export function buildProjectSyncPlan(input: SyncPlanInput): ProjectSyncPlan {
   for (const operation of TOP_LEVEL_ORDER) {
     if (isOptional(input, operation)) {
       steps.push({ operation, dependsOn: DEPENDENCIES[operation], state: "not_applicable", reason: "This resource or change is not part of the selected project sync.", requiresApproval: false });
+      completed.add(operation);
       continue;
     }
 
