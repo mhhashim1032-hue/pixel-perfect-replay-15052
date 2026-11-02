@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { accountRow } from "./accounts.server";
+import { cleanAccounts } from "./accounts";
 import {
   createProjectSyncRun,
   fingerprintProjectSyncPlan,
@@ -118,13 +119,17 @@ export async function createOwnedProjectSyncInspectionRun(input: {
     .maybeSingle();
   if (error || !session) throw new Error("Task not found or access denied.");
 
-  const github = await accountRow(input.userSupabase, input.userId, "github", session.accounts);
-  if (!github) throw new Error("Connect the GitHub account pinned to this task before starting sync inspection.");
-  const supabase = session.supabase_ref
-    ? await accountRow(input.userSupabase, input.userId, "supabase", session.accounts)
+  const pins = cleanAccounts(session.accounts);
+  if (!Object.prototype.hasOwnProperty.call(pins, "github") || !pins.github) {
+    throw new Error("Select and pin a GitHub account to this task before starting sync inspection.");
+  }
+  const github = await accountRow(input.userSupabase, input.userId, "github", pins);
+  if (!github || github.id !== pins.github) throw new Error("The GitHub account pinned to this task is unavailable.");
+  const supabase = session.supabase_ref && pins.supabase
+    ? await accountRow(input.userSupabase, input.userId, "supabase", pins)
     : null;
-  const vercel = session.vercel_project_id
-    ? await accountRow(input.userSupabase, input.userId, "vercel", session.accounts)
+  const vercel = session.vercel_project_id && pins.vercel
+    ? await accountRow(input.userSupabase, input.userId, "vercel", pins)
     : null;
 
   const plan = buildReadOnlyInspectionPlan({
