@@ -59,7 +59,7 @@ export function AutoFixButton({ id, onSend, onSteps, compact, disabled }: { id: 
   const m = useMutation({
     mutationFn: () => fix({ data: { id } }),
     onSuccess: (r) => {
-      onSteps?.(r.steps);
+      if (onSteps) onSteps(r.steps);
       if (!r.prompt) { toast.success("Nothing to fix — connections are in sync and the site is healthy"); return; }
       toast.success("Synced. The agent is fixing the remaining problems");
       onSend(r.prompt);
