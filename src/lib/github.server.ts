@@ -7,7 +7,7 @@ export class GitHub {
   async req<T = any>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(`https://api.github.com/${path}`, {
       ...init,
-      signal: init.signal ?? this.signal,
+      ...(this.signal ? { signal: this.signal } : {}),
       headers: {
         Accept: "application/vnd.github+json",
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
