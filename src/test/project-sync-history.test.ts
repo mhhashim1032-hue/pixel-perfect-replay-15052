@@ -42,6 +42,8 @@ describe("project sync history safety", () => {
   it("redacts credentials in stored history errors", () => {
     expect(safeProjectSyncHistoryError("Bearer abc.def sk_live_12345678 api_key=secret-value"))
       .toBe("Bearer [REDACTED] [REDACTED_KEY] api_key=[REDACTED]");
+    expect(safeProjectSyncHistoryError("refresh_token=refresh-secret&password =hidden-value"))
+      .toBe("refresh_token=[REDACTED]&password=[REDACTED]");
     expect(safeProjectSyncHistoryError(null)).toBeNull();
   });
 
