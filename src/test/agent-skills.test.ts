@@ -8,6 +8,13 @@ describe("saved skill access", () => {
     expect(await access.tools.list_skills.execute({}, options)).toEqual({ skills: [{ name: "frontend-design", chars: 22, loaded: true }] });
     expect(await access.tools.read_skill.execute({ name: "Frontend-design" }, options)).toEqual({ name: "frontend-design", instructions: "Use purposeful motion." });
   });
+  it("keeps loaded skills below user and project instruction authority", () => {
+    const access = agentSkills([{ name: "frontend-design", instructions: "Use purposeful motion." }], null);
+    expect(access.context).toContain("the user's explicit instructions and authorization");
+    expect(access.context).toContain("project instructions");
+    expect(access.context).toContain("loaded skills");
+    expect(access.context.indexOf("project instructions")).toBeLessThan(access.context.indexOf("loaded skills"));
+  });
   it("does not silently treat failed skill loading as an empty collection", () => {
     expect(() => agentSkills(null, { code: "denied" })).toThrow("Could not load your saved skills");
   });
