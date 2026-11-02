@@ -47,3 +47,11 @@ No platform AI key is required: all inference uses the user's own credentials.
 ## License
 
 MIT — see `LICENSE`.
+
+## Forge Universal Agent Foundation
+
+The working agent is named **Forge** and follows the model-independent operating specification in [UAF](UAF/README.md). The constitution, task/tool/recovery protocols, customer infrastructure sync contract, portable schemas, evaluation cases and audited built-in skills live in the repository.
+
+UAF augments the existing engine rather than replacing provider adapters, the task lifecycle, skill/memory systems, MCP, sandbox, or control plane. Customer GitHub, Supabase and Vercel remain customer-owned BYO infrastructure; Forge does not silently create, replace or migrate those resources. See [the adoption plan](docs/ADOPT_UAF_IN_FORGE.md).
+
+The synchronization target is **recoverable and verifiable**, not a claim of zero provider failures: durable per-step state, pinned ownership, idempotency, bounded retries, read-back verification, and safe resume after partial failure.
