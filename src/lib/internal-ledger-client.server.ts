@@ -32,7 +32,18 @@ export function resolveInternalLedgerConfig(
   if (parsed.protocol !== "https:" && !localHttp) {
     throw new Error("Forge internal Supabase URL must use HTTPS (HTTP is allowed only for localhost).");
   }
-  if (serviceRoleKey.startsWith("sb_publishable_") || serviceRoleKey.startsWith("eyJ") === false && !serviceRoleKey.startsWith("sb_secret_")) {
+  const isSupabaseSecret = serviceRoleKey.startsWith("sb_secret_");
+  const isLegacyServiceRoleJwt = (() => {
+    const parts = serviceRoleKey.split(".");
+    if (parts.length !== 3) return false;
+    try {
+      const payload = JSON.parse(atob(parts[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { role?: unknown };
+      return payload.role === "service_role";
+    } catch {
+      return false;
+    }
+  })();
+  if (!isSupabaseSecret && !isLegacyServiceRoleJwt) {
     throw new Error("Forge internal ledger requires a server-only service-role or Supabase secret key; publishable/anon keys are not accepted.");
   }
 
