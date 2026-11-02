@@ -15,7 +15,7 @@ const safe = (e: unknown) => {
   return m.slice(0, 160);
 };
 
-export async function syncProject(sb: any, s: Session, opts: { applyMigrations?: boolean } = {}) {
+export async function syncProject(sb: any, s: Session, opts: { applyMigrations?: boolean; allowSettingsWrites?: boolean } = {}) {
   const steps: SyncStep[] = [];
   const buildErrors: string[] = [];
   const [gt, st, vt] = await Promise.all([
@@ -46,7 +46,9 @@ export async function syncProject(sb: any, s: Session, opts: { applyMigrations?:
   // Database settings into Vercel
   if (!s.supabase_ref) steps.push({ key: "database", label: "Database", state: "skip", note: st ? "Choose a database in Deploy" : "Not connected" });
   else if (!st) steps.push({ key: "database", label: "Database", state: "fail", note: "Database account missing; reconnect it" });
-  else if (s.vercel_project_id && vt) {
+  else if (s.vercel_project_id && vt && !opts.allowSettingsWrites) {
+    steps.push({ key: "database", label: "Database settings in Vercel", state: "warn", note: "Customer settings were inspected only. Review and explicitly approve environment changes in Deploy before syncing." });
+  } else if (s.vercel_project_id && vt) {
     try {
       const { syncTaskDatabase } = await import("./deployment-settings.server");
       await syncTaskDatabase(s.user_id, s.id, s.supabase_ref, s.vercel_project_id, st, vt);
@@ -57,14 +59,16 @@ export async function syncProject(sb: any, s: Session, opts: { applyMigrations?:
     }
   } else steps.push({ key: "database", label: "Database", state: "ok", note: "Linked" });
 
-  // Sign-in return links (the usual reason login/logout break after deploy)
-  if (s.supabase_ref && st) {
+  // Auth settings can change signup confirmation, site URL and allowed redirects. Never mutate them from a broad sync.
+  if (s.supabase_ref && st && !opts.allowSettingsWrites) {
+    steps.push({ key: "auth", label: "Signup and sign-in settings", state: "warn", note: "Authentication settings were not changed. Review the proposed redirect and confirmation changes in Deploy." });
+  } else if (s.supabase_ref && st) {
     try {
       const { syncCustomerAuth } = await import("./customer-auth.server");
       const { selectedCustomDomain } = await import("./project-setup.server");
       const domain = s.vercel_project_id && vt ? await selectedCustomDomain(s.user_id, s.id, s.vercel_project_id, s.supabase_ref, st, vt) : undefined;
       await syncCustomerAuth(s.supabase_ref, st, domains, domain);
-      steps.push({ key: "auth", label: "Signup and sign-in", state: "ok", note: "Email confirmation off; sign-in return links checked" });
+      steps.push({ key: "auth", label: "Signup and sign-in", state: "ok", note: "Authentication settings synchronized and verified" });
     } catch (e) { steps.push({ key: "auth", label: "Sign-in links", state: "warn", note: `Couldn't check: ${safe(e)}. Use a database token with full access.` }); }
   }
 
