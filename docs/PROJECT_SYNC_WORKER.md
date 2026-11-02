@@ -10,7 +10,7 @@ Remaining work: provider adapters, secured scheduler/trigger, per-user authoriza
 
 ## First provider executor (read-only)
 
-A server-only allowlisted executor now supports `inspect_repository` for GitHub. It reloads the run owner and task session from Forge's internal database, resolves only the GitHub credential selected for that session, and rejects an input fingerprint that does not match the current user/session/repository/branch/credential tuple. The adapter checks the branch head before and after reading the tree and refuses success if the branch moved during inspection.
+A server-only allowlisted executor now supports `inspect_repository` for GitHub and `verify_database_binding` for Supabase. It reloads the run owner and task session from Forge's internal database, resolves only the GitHub credential selected for that session, and rejects an input fingerprint that does not match the current user/session/repository/branch/credential tuple. The GitHub adapter checks the branch head before and after reading the tree and refuses success if the branch moved during inspection. The Supabase adapter reads the status of the exact pinned project through the Supabase Management API; it does not run SQL or change project settings. Both adapters pass worker cancellation to provider requests and bind execution to the selected credential record.
 
 All other operations return a terminal failed result until their own reviewed adapters are implemented. In particular, there is no customer Supabase migration, environment update, Auth change, Vercel deploy, branch write, or public worker trigger enabled by this executor. The run creator and secured trigger are still not wired into the product UI.
 
