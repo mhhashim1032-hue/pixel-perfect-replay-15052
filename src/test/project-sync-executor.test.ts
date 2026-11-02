@@ -31,7 +31,7 @@ describe("project sync executor allowlist", () => {
     expect(vercelBindingInputFingerprint({ ...input, credentialId: "vercel-account-2" })).not.toBe(fingerprint);
   });
 
-  it("rejects every provider operation except the explicitly implemented GitHub inspection", async () => {
+  it("rejects every provider operation except the explicitly implemented read-only provider inspections", async () => {
     const executor = createProjectSyncExecutor({} as never);
     const result = await executor({
       id: "step-1",
