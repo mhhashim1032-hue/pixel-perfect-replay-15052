@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { accountToken } from "./accounts.server";
 import { Vercel } from "./integrations.server";
 
@@ -35,7 +36,7 @@ function assertRepository(value: string): string {
 
 /** Read-only verification of the exact Vercel project pinned to an owned Forge session. */
 export async function inspectPinnedVercelProject(input: {
-  supabase: any;
+  supabase: SupabaseClient;
   userId: string;
   session: VercelInspectSession;
   signal?: AbortSignal;
