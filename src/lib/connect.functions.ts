@@ -49,3 +49,25 @@ export const autoFix = createServerFn({ method: "POST" })
       deploymentAllowed: deployAllowed(level)
     };
   });
+
+/**
+ * Creates a durable run containing only the currently enabled read-only provider
+ * inspections. It does not start a worker or modify customer infrastructure.
+ * requestId is generated once by the client and reused for network retries.
+ */
+export const startProjectSyncInspection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ id: z.string().uuid(), requestId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const [{ getInternalLedgerAdmin }, { createOwnedProjectSyncInspectionRun }] = await Promise.all([
+      import("./internal-ledger-client.server"),
+      import("./project-sync-launch.server"),
+    ]);
+    return createOwnedProjectSyncInspectionRun({
+      userSupabase: context.supabase,
+      internalAdmin: getInternalLedgerAdmin(),
+      userId: context.userId,
+      sessionId: data.id,
+      idempotencyKey: data.requestId,
+    });
+  });
