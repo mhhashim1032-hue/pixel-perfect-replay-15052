@@ -76,7 +76,7 @@ describe("reasoning profiles", () => {
     expect(FORGE_OPERATING_CONTRACT).toContain("Identity: Forge");
     expect(FORGE_OPERATING_CONTRACT).toContain("task-pinned");
     expect(modelOperatingCapabilities("some-unknown-model")).toEqual({
-      known: false, toolCalling: false, reasoningControls: false, requiresCapabilityProbe: true,
+      known: false, toolCalling: false, vision: false, reasoningControls: false, contextWindow: null, requiresCapabilityProbe: true,
     });
   });
 
