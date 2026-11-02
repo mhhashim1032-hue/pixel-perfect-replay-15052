@@ -10,12 +10,13 @@ describe("Forge internal ledger credentials", () => {
   });
 
   it("accepts a dedicated HTTPS service-role configuration", () => {
+    const serviceRoleKey = `e30.${btoa(JSON.stringify({ role: "service_role" })).replace(/=/g, "")}.signature`;
     expect(resolveInternalLedgerConfig({
       FORGE_INTERNAL_SUPABASE_URL: "https://forge-internal.supabase.co/",
-      FORGE_INTERNAL_SUPABASE_SERVICE_ROLE_KEY: `e30.${btoa(JSON.stringify({ role: "service_role" })).replace(/=/g, "")}.signature`,
+      FORGE_INTERNAL_SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
     })).toEqual({
       url: "https://forge-internal.supabase.co",
-      serviceRoleKey: "eyJ-service-role-jwt",
+      serviceRoleKey,
     });
   });
 
