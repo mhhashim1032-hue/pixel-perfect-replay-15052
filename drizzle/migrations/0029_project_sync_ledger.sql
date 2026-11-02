@@ -247,7 +247,7 @@ BEGIN
   END IF;
   RETURN v_run_id;
 END;
-$;
+$$;
 
 -- Lease renewal is compare-and-set; a worker that lost its lease cannot resurrect it.
 CREATE OR REPLACE FUNCTION public.project_sync_renew_step(
