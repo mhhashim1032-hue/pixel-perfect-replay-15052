@@ -59,11 +59,11 @@ export function autoFixPrompt(steps: SyncStep[], buildErrors: string[]): string 
   const lines = [
     productionInstructions,
     "AUTO-FIX: make this project build, deploy and work (including sign-in and sign-out) on the live site.",
-    "Connections were already synced by Forge (database settings in Vercel, sign-in return links, migrations). Remaining blockers:",
+    "Forge inspected the customer connections without changing customer infrastructure. Environment settings, auth configuration and database migrations remain pending explicit review and approval. Remaining blockers:",
     ...problems.map((p) => `- ${p.label}: ${p.note}`),
     ...(buildErrors.length ? ["Latest build errors:", ...buildErrors.slice(0, 12).map((e) => `  ${e}`)] : []),
     "",
-    "Rules: follow the deployment-safe-coding skill; fix root causes in code, not by disabling checks; keep server-only keys out of browser code;",
+    "Rules: follow the deployment-safe-coding skill; fix root causes in code, not by disabling checks; keep server-only keys out of browser code; never write customer environment/auth settings or apply migrations from Auto-fix;",
     "sign-in must use the current site address for return links and sign-out must clear the session and return to the sign-in page;",
     "run deployment_preflight, then deploy_status, and repeat at most 3 repair rounds. Finish with one short result: live and working, or the single remaining blocker.",
   ];
