@@ -4,6 +4,7 @@ import { accountRow } from "./accounts.server";
 import { fingerprintProjectSyncPlan } from "./project-sync-ledger.server";
 import { inspectPinnedGitHubRepository } from "./project-sync-github-adapter.server";
 import { inspectPinnedSupabaseProject } from "./project-sync-supabase-adapter.server";
+import { inspectPinnedVercelProject } from "./project-sync-vercel-adapter.server";
 import type { ProjectSyncExecutor } from "./project-sync-worker.server";
 
 type SyncRunOwner = { user_id: string; session_id: string };
@@ -13,6 +14,7 @@ type PinnedSession = {
   repo: string;
   work_branch: string;
   supabase_ref: string | null;
+  vercel_project_id: string | null;
   accounts?: unknown;
 };
 
@@ -67,12 +69,30 @@ async function loadOwnedRunContext(
   const owner = run as SyncRunOwner;
   const { data: session, error: sessionError } = await internalAdmin
     .from("agent_sessions")
-    .select("id, user_id, repo, work_branch, supabase_ref, accounts")
+    .select("id, user_id, repo, work_branch, supabase_ref, vercel_project_id, accounts")
     .eq("id", owner.session_id)
     .eq("user_id", owner.user_id)
     .maybeSingle();
   if (sessionError || !session) throw new Error("The project session is no longer available to its owner.");
   return { owner, session: session as PinnedSession };
+}
+
+/** Fingerprint the exact Vercel project, repository and credential for read-only verification. */
+export function vercelBindingInputFingerprint(input: {
+  userId: string;
+  sessionId: string;
+  projectId: string;
+  repository: string;
+  credentialId: string;
+}): string {
+  return fingerprintProjectSyncPlan({
+    operation: "verify_deployment_binding",
+    userId: input.userId,
+    sessionId: input.sessionId,
+    projectId: input.projectId,
+    repository: input.repository,
+    vercelCredentialId: input.credentialId,
+  });
 }
 
 /**
@@ -83,7 +103,7 @@ async function loadOwnedRunContext(
 export function createProjectSyncExecutor(internalAdmin: SupabaseClient): ProjectSyncExecutor {
   return async (step: LedgerStepLease, { signal }) => {
     signal.throwIfAborted();
-    if (step.operation !== "inspect_repository" && step.operation !== "verify_database_binding") {
+    if (step.operation !== "inspect_repository" && step.operation !== "verify_database_binding" && step.operation !== "verify_deployment_binding") {
       return { state: "failed", safeError: "This project sync operation has no enabled provider executor yet." };
     }
 
@@ -118,7 +138,27 @@ export function createProjectSyncExecutor(internalAdmin: SupabaseClient): Projec
     if (expectedFingerprint !== step.input_fingerprint) {
       return { state: "failed", safeError: "The Supabase account or project changed after this sync plan was created. Review the plan again." };
     }
-    const result = await inspectPinnedSupabaseProject({ supabase: internalAdmin, userId: owner.user_id, session, signal });
-    return { state: "succeeded", outputFingerprint: result.outputFingerprint };
+    if (step.operation === "verify_database_binding") {
+      const result = await inspectPinnedSupabaseProject({ supabase: internalAdmin, userId: owner.user_id, session, signal });
+      return { state: "succeeded", outputFingerprint: result.outputFingerprint };
+    }
+
+    const vercelAccount = await accountRow(internalAdmin, owner.user_id, "vercel", session.accounts);
+    if (!vercelAccount) return { state: "failed", safeError: "Connect the Vercel account pinned to this project." };
+    const expectedVercelFingerprint = vercelBindingInputFingerprint({
+      userId: owner.user_id,
+      sessionId: session.id,
+      projectId: session.vercel_project_id ?? "",
+      repository: session.repo,
+      credentialId: vercelAccount.id,
+    });
+    if (expectedVercelFingerprint !== step.input_fingerprint) {
+      return { state: "failed", safeError: "The Vercel account, project or repository changed after this sync plan was created. Review the plan again." };
+    }
+    const vercelResult = await inspectPinnedVercelProject({ supabase: internalAdmin, userId: owner.user_id, session, signal });
+    if (!vercelResult.repositoryMatches) {
+      return { state: "failed", safeError: "The pinned Vercel project is not linked to this task's GitHub repository. Correct the project link and review the plan again." };
+    }
+    return { state: "succeeded", outputFingerprint: vercelResult.outputFingerprint };
   };
 }
