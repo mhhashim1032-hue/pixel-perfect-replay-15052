@@ -35,6 +35,16 @@ type SyncEventRow = {
   created_at: string;
 };
 
+/** Bound and redact provider error text before it reaches a browser. */
+export function safeProjectSyncHistoryError(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return value
+    .replace(/Bearer\\s+[^\\s"'<>]+/gi, "Bearer [REDACTED]")
+    .replace(/(?:sk|pk|sb_secret|sb_publishable)_[A-Za-z0-9_-]{8,}/g, "[REDACTED_KEY]")
+    .replace(/(access_token|refresh_token|api_key|apikey|password|secret)=([^&\\s]+)/gi, "$1=[REDACTED]")
+    .slice(0, 300);
+}
+
 /** Expose only the small, non-secret event fields needed by the history UI. */
 export function safeProjectSyncEventPayload(value: unknown): Record<string, string | number | null> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -42,7 +52,7 @@ export function safeProjectSyncEventPayload(value: unknown): Record<string, stri
   const result: Record<string, string | number | null> = {};
   for (const key of ["stepKey", "operation", "state", "error", "outputFingerprint"] as const) {
     const item = source[key];
-    if (typeof item === "string") result[key] = item.slice(0, key === "error" ? 300 : 200);
+    if (typeof item === "string") result[key] = key === "error" ? (safeProjectSyncHistoryError(item) ?? "") : item.slice(0, 200);
   }
   if (typeof source.attempt === "number" && Number.isInteger(source.attempt)) {
     result.attempt = Math.max(0, Math.min(100, source.attempt));
@@ -129,7 +139,7 @@ export async function readOwnedProjectSyncHistory(input: {
         attempt: step.attempt,
         maxAttempts: step.max_attempts,
         nextRetryAt: step.next_retry_at,
-        error: step.last_error?.slice(0, 300) ?? null,
+        error: safeProjectSyncHistoryError(step.last_error),
         outputFingerprint: step.output_fingerprint,
         createdAt: step.created_at,
         updatedAt: step.updated_at,
