@@ -27,7 +27,7 @@ Always re-check provider terms before provisioning; free tiers and eligibility c
 - Use GitHub-hosted Actions for ordinary CI when possible. Do not route untrusted pull-request code to a persistent self-hosted runner.
 - Use a GPU only for local inference/training. When the model is called through an API, the model provider supplies the GPU; Forge's worker mostly needs CPU, RAM, disk and network.
 
-**Current implementation status:** this repository now has the ledger schema, typed ledger adapter and dedicated internal-ledger client. The production queue consumer, provider execution adapters and worker health endpoint are still future work. The bootstrap script below only prepares an Ubuntu ARM64 host; it does not deploy Forge, configure secrets, apply migrations or enable a worker.
+**Current implementation status:** this repository now has the ledger schema, typed ledger adapter, dedicated internal-ledger client, and a one-step worker loop with lease renewal, fencing, retries and redacted events. Trusted GitHub/Supabase/Vercel execution adapters, a secured worker trigger, health/monitoring and history UI are still future work. The bootstrap script below only prepares an Ubuntu host; it does not deploy Forge, configure secrets, apply migrations or enable a worker.
 
 ## Oracle Cloud Always Free setup
 
