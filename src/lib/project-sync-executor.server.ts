@@ -127,18 +127,18 @@ export function createProjectSyncExecutor(internalAdmin: SupabaseClient): Projec
       return { state: "succeeded", outputFingerprint: result.outputFingerprint };
     }
 
-    const supabaseAccount = await accountRow(internalAdmin, owner.user_id, "supabase", session.accounts);
-    if (!supabaseAccount) return { state: "failed", safeError: "Connect the Supabase account pinned to this project." };
-    const expectedFingerprint = supabaseBindingInputFingerprint({
-      userId: owner.user_id,
-      sessionId: session.id,
-      projectRef: session.supabase_ref ?? "",
-      credentialId: supabaseAccount.id,
-    });
-    if (expectedFingerprint !== step.input_fingerprint) {
-      return { state: "failed", safeError: "The Supabase account or project changed after this sync plan was created. Review the plan again." };
-    }
     if (step.operation === "verify_database_binding") {
+      const supabaseAccount = await accountRow(internalAdmin, owner.user_id, "supabase", session.accounts);
+      if (!supabaseAccount) return { state: "failed", safeError: "Connect the Supabase account pinned to this project." };
+      const expectedFingerprint = supabaseBindingInputFingerprint({
+        userId: owner.user_id,
+        sessionId: session.id,
+        projectRef: session.supabase_ref ?? "",
+        credentialId: supabaseAccount.id,
+      });
+      if (expectedFingerprint !== step.input_fingerprint) {
+        return { state: "failed", safeError: "The Supabase account or project changed after this sync plan was created. Review the plan again." };
+      }
       const result = await inspectPinnedSupabaseProject({ supabase: internalAdmin, userId: owner.user_id, session, signal });
       return { state: "succeeded", outputFingerprint: result.outputFingerprint };
     }
