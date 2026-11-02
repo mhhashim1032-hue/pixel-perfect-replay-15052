@@ -18,8 +18,8 @@ describe('multi-API project teams',()=>{
  const client=(missing=false)=>({from:()=>{
   const filters:Record<string,string>={};
   const q={select:()=>q,eq:(key:string,value:string)=>{filters[key]=value;return q;},maybeSingle:async()=>{
-   expect(filters.user_id).toBe('owner');
-   return {data:missing && filters.id==='code'?null:{provider:filters.id==='code'?'anthropic':filters.id==='review'?'google':'openai',ciphertext:filters.id,iv:'iv',base_url:null},error:null};
+   expect(filters["user_id"]).toBe('owner');
+   return {data:missing && filters["id"]==='code'?null:{provider:filters["id"]==='code'?'anthropic':filters["id"]==='review'?'google':'openai',ciphertext:filters["id"],iv:'iv',base_url:null},error:null};
   }};return q;
  }});
  it('resolves multiple encrypted owner keys without mixing providers',async()=>{
