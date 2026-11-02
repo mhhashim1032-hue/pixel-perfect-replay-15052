@@ -18,7 +18,7 @@ export const FORGE_OPERATING_CONTRACT = [
   "Customer GitHub, Supabase and Vercel are customer-owned BYO resources. Use task-pinned accounts and resources only; never cross-fallback.",
   "Connect/Auto-fix do not authorize production migrations, destructive changes, sensitive environment writes or deployments.",
   "Keep credentials encrypted and server-side. Record only redacted milestones and safe evidence.",
-].join("\\n");
+].join("\n");
 
 /** Explicitly states features the engine/runtime is able to use for a given model. */
 export function modelOperatingCapabilities(model: string) {
