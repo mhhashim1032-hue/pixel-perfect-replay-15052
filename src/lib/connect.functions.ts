@@ -19,7 +19,7 @@ export const syncProject = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const s = await owned(context, data.id);
     const { syncProject: run } = await import("./connect.server");
-    const r = await run(context.supabase, s, { applyMigrations: false });
+    const r = await run(context.supabase, s);
     return { steps: r.steps, overall: r.overall };
   });
 
