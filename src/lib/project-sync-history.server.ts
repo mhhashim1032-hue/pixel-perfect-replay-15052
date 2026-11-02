@@ -55,7 +55,7 @@ export function safeProjectSyncEventPayload(value: unknown): Record<string, stri
     if (typeof item === "string") result[key] = key === "error" ? (safeProjectSyncHistoryError(item) ?? "") : item.slice(0, 200);
   }
   if (typeof source["attempt"] === "number" && Number.isInteger(source["attempt"])) {
-    result.attempt = Math.max(0, Math.min(100, source["attempt"] as number));
+    result["attempt"] = Math.max(0, Math.min(100, source["attempt"] as number));
   }
   return result;
 }
