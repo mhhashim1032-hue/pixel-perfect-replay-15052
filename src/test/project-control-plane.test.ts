@@ -93,6 +93,26 @@ describe("customer project control-plane planning", () => {
     expect(plan.steps.find((step) => step.operation === "verify_runtime")?.state).toBe("ready");
   });
 
+  it("allows a deployment without a database when optional database steps are omitted", () => {
+    const plan = buildProjectSyncPlan(input({
+      hasDatabase: false,
+      pendingMigrations: 0,
+      allowProductionDeployment: true,
+      approvedOperations: ["deploy_exact_commit"],
+      approvalBinding: "plan-no-db",
+      currentPlanBinding: "plan-no-db",
+    }));
+    expect(plan.steps.find((step) => step.operation === "sync_environment")?.state).toBe("not_applicable");
+    expect(plan.steps.find((step) => step.operation === "deploy_exact_commit")?.state).toBe("ready");
+    expect(plan.steps.find((step) => step.operation === "verify_runtime")?.state).toBe("ready");
+  });
+
+  it("omits runtime verification when no source commit is selected", () => {
+    const plan = buildProjectSyncPlan(input({ hasCommit: false }));
+    expect(plan.steps.find((step) => step.operation === "deploy_exact_commit")?.state).toBe("not_applicable");
+    expect(plan.steps.find((step) => step.operation === "verify_runtime")?.state).toBe("not_applicable");
+  });
+
   it("does not allow a missing provider resource to be treated as connected", () => {
     const providers = { ...connected, supabase: { ...connected.supabase, resourceSelected: false } };
     const plan = buildProjectSyncPlan(input({ providers }));
