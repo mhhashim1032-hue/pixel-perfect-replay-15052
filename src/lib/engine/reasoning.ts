@@ -26,7 +26,9 @@ export function modelOperatingCapabilities(model: string) {
   return {
     known: caps.known,
     toolCalling: caps.known ? caps.tools : false,
+    vision: caps.known ? caps.vision : false,
     reasoningControls: caps.known ? caps.reasoning : false,
+    contextWindow: caps.known ? caps.contextWindow : null,
     requiresCapabilityProbe: !caps.known,
   };
 }
