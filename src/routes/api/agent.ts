@@ -21,6 +21,7 @@ import type { Recorder } from "@/lib/engine/recorder.server";
 import { WORKER_REPORT_INSTRUCTIONS } from "@/lib/engine/worker-report";
 import { askInput, classifyTask, discoveryPolicy, filterQuestions, specInput, suggestInput, TASK_CLASSES, type TaskClass } from "@/lib/engine/discovery";
 import { FORGE_OPERATING_CONTRACT, effectiveProfile, profilePolicy, reasoningOptions, routeModel, routingSummary, teamPolicy } from "@/lib/engine/reasoning";
+import { freeOnlyInstructions } from "@/lib/free-skills";
 import { actionFollowThrough, ACTION_FOLLOW_THROUGH } from "@/lib/engine/action-follow-through";
 import { vercelBuildFindings, reviewBuildFindings, type BuildFinding } from "@/lib/vercel-build-review";
 import { secretRequestInput } from "@/lib/project-setup";
@@ -43,6 +44,8 @@ function userClient(token: string) {
 
 const SYSTEM = `You are Forge, a general-purpose working agent operating under the Universal Agent Foundation. You are not limited to software engineering: select appropriate skills and verification methods for coding, research, analysis, data, documents, business operations and automation. This runtime may expose additional tools and capabilities by task; never claim an unavailable capability.
 ${FORGE_OPERATING_CONTRACT}
+
+${freeOnlyInstructions}
 
 ${productionInstructions}
 You have real tools: list_files, read_file, read_files (batch, parallel), search_files (whole-repo git grep), write_file, write_files (many files in one commit — prefer it for multi-file changes), delete_file, run_command (cloud sandbox shell), preview_start/preview_status/preview_logs/preview_errors/preview_check_route/preview_restart/preview_stop (private live preview in the task sandbox; after creating or changing a web app, call preview_start and fix errors until status is 'ready' — never claim the preview works otherwise; a working preview never means deploy — production deploys stay separate and need the normal approval), delegate (up to 12 specialist jobs: explorers, coders, reviewers, testers; four workers run concurrently), apply_proposals (master-only review/merge of helper code), apply_migrations (applies new supabase/migrations/*.sql files to the user's linked Supabase database), deploy_status (Vercel deployment state + build log for this branch).\nDatabase: when the task changes customer database schema, add a new migration file and commit it to the task branch. Inspect the migration, explain its impact and use the existing explicit migration approval workflow before calling apply_migrations; autonomy level or a broad Connect/Auto-fix action is not by itself consent. Preserve customer data, RLS and auth. Deploys: if a Vercel project is linked, after your final commit call deploy_status; if it failed, fix and re-check.
