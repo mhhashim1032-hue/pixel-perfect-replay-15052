@@ -27,7 +27,23 @@ Always re-check provider terms before provisioning; free tiers and eligibility c
 - Use GitHub-hosted Actions for ordinary CI when possible. Do not route untrusted pull-request code to a persistent self-hosted runner.
 - Use a GPU only for local inference/training. When the model is called through an API, the model provider supplies the GPU; Forge's worker mostly needs CPU, RAM, disk and network.
 
-**Current implementation status:** this repository now has the ledger schema, typed ledger adapter, dedicated internal-ledger client, and a one-step worker loop with lease renewal, fencing, retries and redacted events. Trusted GitHub/Supabase/Vercel execution adapters, a secured worker trigger, health/monitoring and history UI are still future work. The bootstrap script below only prepares an Ubuntu host; it does not deploy Forge, configure secrets, apply migrations or enable a worker.
+**Current implementation status:** this repository now has the ledger schema, typed ledger adapter, dedicated internal-ledger client, and a one-step worker loop with lease renewal, fencing, retries and redacted events. Read-only GitHub/Supabase/Vercel execution adapters and a secret-protected bounded worker trigger now exist. The trigger is not scheduled or deployed; authenticated history APIs are being added, while the history UI, health/monitoring and production isolation remain future work. The bootstrap script below only prepares an Ubuntu host; it does not deploy Forge, configure secrets, apply migrations or enable a worker.
+
+## Oracle account is ready: next steps
+
+The account is already available, so skip account registration. Do not upgrade to Pay As You Go or enable paid resources for this project.
+
+1. Open OCI Console and confirm the account's **home region** and Free Tier status.
+2. Open **Compute → Instances → Create instance**. Choose Ubuntu 24.04 ARM64 and VM.Standard.A1.Flex (Ampere A1).
+3. Keep the total shape allocation within the Always Free limit: at most 4 OCPUs and 24 GB memory in the current A1 free allowance, subject to available capacity and the account's eligibility. For Forge's first worker, start smaller: 2 OCPUs and 12 GB RAM.
+4. Use a 50 GB boot volume initially. Keep all boot and block volumes within the account's Always Free storage quota.
+5. Assign a public IPv4 address if available. Add an SSH public key during instance creation; keep the private key only on your device.
+6. In the VCN security list or Network Security Group, allow inbound TCP 22 only from your current public IP where practical. Do not open 3000, 3001, 5432, 8080 or any worker port to the internet.
+7. Create the instance and wait for its public IP and SSH connection details. If A1 capacity is unavailable, do not select a paid shape; retry later or use a smaller eligible shape.
+8. Connect over SSH from your phone, verify Ubuntu/architecture and disk/memory, then review and run the bootstrap script below.
+9. Stop here after host preparation. Do not add production secrets, apply migration 0029, clone/run arbitrary customer repositories, or start the worker until the isolation and deployment steps are reviewed.
+
+**No credentials needed in chat:** never send the OCI password, private SSH key, API signing key, Supabase service-role key, GitHub PAT or Vercel token here. You can share non-secret instance details such as shape, OS, region, public IP (if comfortable), and whether SSH works.
 
 ## Oracle Cloud Always Free setup
 
