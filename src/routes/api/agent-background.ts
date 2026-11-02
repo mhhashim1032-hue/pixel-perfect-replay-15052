@@ -2,6 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { agentRequest, requestError } from "@/lib/agent-request";
 import { agentOrigin } from "@/lib/background-run";
+import { z } from "zod";
+import { getInternalLedgerAdmin } from "@/lib/internal-ledger-client.server";
+import { createProjectSyncExecutor } from "@/lib/project-sync-executor.server";
+import { runProjectSyncWorkerBatch } from "@/lib/project-sync-worker.server";
+import { isValidProjectSyncWorkerSecret } from "@/lib/project-sync-worker-auth.server";
 
 // Starts a run that keeps going when the user's device sleeps or switches apps:
 // a small cloud keeper holds the agent stream open instead of the browser.
@@ -9,6 +14,33 @@ export const Route = createFileRoute("/api/agent-background")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Private worker mode shares this already-registered route but uses a separate
+        // marker and server-only secret; ordinary user Bearer-token behavior is unchanged.
+        if (request.headers.get("x-forge-sync-worker") === "1") {
+          if (!isValidProjectSyncWorkerSecret(
+            request.headers.get("authorization"),
+            process.env["FORGE_SYNC_WORKER_SECRET"],
+          )) return new Response("Unauthorized", { status: 401 });
+
+          const workerPayload = await request.json().catch(() => null);
+          const workerInput = z.object({ runId: z.string().uuid() }).strict().safeParse(workerPayload);
+          if (!workerInput.success) return new Response("Invalid worker request", { status: 400 });
+          try {
+            const internalAdmin = getInternalLedgerAdmin();
+            const result = await runProjectSyncWorkerBatch({
+              internalAdmin,
+              runId: workerInput.data.runId,
+              execute: createProjectSyncExecutor(internalAdmin),
+              maxSteps: 3,
+              leaseSeconds: 90,
+              signal: request.signal,
+            });
+            return Response.json(result);
+          } catch {
+            return new Response("Project sync worker failed", { status: 500 });
+          }
+        }
+
         const token = request.headers.get("authorization")?.replace(/^Bearer /, "");
         if (!token) return new Response("Unauthorized", { status: 401 });
         const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
