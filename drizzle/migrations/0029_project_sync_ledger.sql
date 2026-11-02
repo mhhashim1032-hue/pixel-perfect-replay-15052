@@ -102,6 +102,12 @@ BEGIN
   UPDATE public.project_sync_runs SET status = 'running', started_at = coalesce(started_at, now()), updated_at = now()
     WHERE id = _run AND status IN ('queued','running');
   IF NOT FOUND THEN RETURN; END IF;
+  -- Exhausted retries and repeatedly expired leases become terminal failures.
+  UPDATE public.project_sync_steps
+    SET state = 'failed', lease_token = NULL, lease_expires_at = NULL,
+        last_error = coalesce(last_error, 'Retry limit reached'), updated_at = now()
+    WHERE run_id = _run AND attempt >= max_attempts
+      AND (state = 'retryable' OR (state = 'leased' AND lease_expires_at <= now()));
   WITH candidate AS (
     SELECT s.id FROM public.project_sync_steps s
     WHERE s.run_id = _run AND s.attempt < s.max_attempts
@@ -146,8 +152,10 @@ BEGIN
     RAISE EXCEPTION 'invalid terminal step state' USING ERRCODE = '22023';
   END IF;
   UPDATE public.project_sync_steps
-    SET state = _state, output_fingerprint = _output_fingerprint,
-        last_error = left(_safe_error, 500), next_retry_at = CASE WHEN _state = 'retryable' THEN _retry_at ELSE NULL END,
+    SET state = CASE WHEN _state = 'retryable' AND attempt >= max_attempts THEN 'failed' ELSE _state END,
+        output_fingerprint = _output_fingerprint,
+        last_error = CASE WHEN _state = 'retryable' AND attempt >= max_attempts THEN coalesce(left(_safe_error, 500), 'Retry limit reached') ELSE left(_safe_error, 500) END,
+        next_retry_at = CASE WHEN _state = 'retryable' AND attempt < max_attempts THEN _retry_at ELSE NULL END,
         lease_token = NULL, lease_expires_at = NULL, updated_at = now()
     WHERE id = _step AND state = 'leased' AND lease_token = _lease_token;
   RETURN FOUND;
@@ -183,7 +191,7 @@ CREATE OR REPLACE FUNCTION public.project_sync_create_run(
   _user uuid, _session uuid, _idempotency_key text, _plan_binding text, _steps jsonb
 ) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE run_id uuid; existing_binding text; existing_session uuid; item jsonb; step_count integer;
+DECLARE v_run_id uuid; existing_binding text; existing_session uuid; item jsonb; step_count integer;
 BEGIN
   IF coalesce(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
@@ -203,14 +211,14 @@ BEGIN
   INSERT INTO public.project_sync_runs(user_id, session_id, idempotency_key, plan_binding)
     VALUES (_user, _session, _idempotency_key, _plan_binding)
     ON CONFLICT (user_id, idempotency_key) DO NOTHING
-    RETURNING id INTO run_id;
-  IF run_id IS NULL THEN
-    SELECT id, plan_binding, session_id INTO run_id, existing_binding, existing_session
+    RETURNING id INTO v_run_id;
+  IF v_run_id IS NULL THEN
+    SELECT id, plan_binding, session_id INTO v_run_id, existing_binding, existing_session
       FROM public.project_sync_runs WHERE user_id = _user AND idempotency_key = _idempotency_key;
     IF existing_binding <> _plan_binding OR existing_session <> _session THEN
       RAISE EXCEPTION 'idempotency key already belongs to a different plan' USING ERRCODE = '23505';
     END IF;
-    RETURN run_id;
+    RETURN v_run_id;
   END IF;
   FOR item IN SELECT value FROM jsonb_array_elements(_steps)
   LOOP
@@ -221,7 +229,7 @@ BEGIN
     INSERT INTO public.project_sync_steps(
       run_id, step_key, operation, state, input_fingerprint, depends_on, approval_binding
     ) VALUES (
-      run_id, item->>'step_key', item->>'operation',
+      v_run_id, item->>'step_key', item->>'operation',
       CASE WHEN item->>'state' = 'approval_required' THEN 'approval_required' ELSE 'queued' END,
       item->>'input_fingerprint',
       ARRAY(SELECT jsonb_array_elements_text(coalesce(item->'depends_on','[]'::jsonb))),
@@ -231,15 +239,15 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.project_sync_steps s
     CROSS JOIN LATERAL unnest(s.depends_on) d
-    WHERE s.run_id = run_id AND NOT EXISTS (
+    WHERE s.run_id = v_run_id AND NOT EXISTS (
       SELECT 1 FROM public.project_sync_steps p WHERE p.run_id = s.run_id AND p.step_key = d
     )
   ) THEN
     RAISE EXCEPTION 'sync graph references an unknown prerequisite' USING ERRCODE = '22023';
   END IF;
-  RETURN run_id;
+  RETURN v_run_id;
 END;
-$$;
+$;
 
 -- Lease renewal is compare-and-set; a worker that lost its lease cannot resurrect it.
 CREATE OR REPLACE FUNCTION public.project_sync_renew_step(
@@ -267,7 +275,19 @@ BEGIN
   IF coalesce(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service role required' USING ERRCODE = '42501';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.project_sync_steps WHERE run_id = _run AND state IN ('queued','leased','retryable')) THEN
+  IF EXISTS (SELECT 1 FROM public.project_sync_steps WHERE run_id = _run AND state = 'leased')
+    OR EXISTS (
+      SELECT 1 FROM public.project_sync_steps s
+      WHERE s.run_id = _run AND s.state IN ('queued','retryable')
+        AND NOT EXISTS (
+          SELECT 1 FROM unnest(s.depends_on) dependency(step_key)
+          WHERE NOT EXISTS (
+            SELECT 1 FROM public.project_sync_steps p
+            WHERE p.run_id = s.run_id AND p.step_key = dependency.step_key
+              AND p.state IN ('succeeded','skipped')
+          )
+        )
+    ) THEN
     RETURN 'running';
   END IF;
   SELECT CASE
