@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { accountToken } from "./accounts.server";
 import { SupabaseMgmt } from "./integrations.server";
 
@@ -24,7 +25,7 @@ function assertProjectRef(value: string | null): string {
 
 /** Read-only verification of the exact Supabase project pinned to an owned Forge session. */
 export async function inspectPinnedSupabaseProject(input: {
-  supabase: any;
+  supabase: SupabaseClient;
   userId: string;
   session: SupabaseInspectSession;
   signal?: AbortSignal;
