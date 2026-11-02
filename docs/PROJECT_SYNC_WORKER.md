@@ -30,7 +30,7 @@ This endpoint creates a queued ledger record only. It does not invoke the worker
 
 ## Secret-protected worker trigger
 
-A bounded `POST /api/project-sync-worker` endpoint is now implemented for internal automation. It requires `Authorization: Bearer <secret>` where `FORGE_SYNC_WORKER_SECRET` is a high-entropy URL-safe secret of at least 32 characters. Comparison is constant-time. The request body accepts only a UUID `runId`; provider URLs, operations, account IDs, step payloads and credentials are never accepted from the caller.
+A bounded worker mode on the existing `POST /api/agent-background` endpoint is now implemented for internal automation. It requires `X-Forge-Sync-Worker: 1` plus `Authorization: Bearer <secret>` where `FORGE_SYNC_WORKER_SECRET` is a high-entropy URL-safe secret of at least 32 characters. Comparison is constant-time. The request body accepts only a UUID `runId`; provider URLs, operations, account IDs, step payloads and credentials are never accepted from the caller.
 
 Each invocation processes at most three ready steps with 90-second fenced leases and propagates request cancellation. The executor still permits only the three read-only provider inspections; all customer writes remain disabled. Missing or weak secrets fail closed. The secret must be configured only in a trusted server/worker environment and must never be exposed to browser code.
 
