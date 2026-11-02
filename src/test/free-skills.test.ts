@@ -9,16 +9,26 @@ describe('strict free-only rules', () => {
     expect(freeResourcePolicy.paidResourcesAllowed).toBe(false);
     expect(freeResourcePolicy.mandatoryPaidDependenciesAllowed).toBe(false);
   });
-  it('provides all thirteen categories without executing downloaded scripts', () => {
-    expect(freeSkillLibrary).toHaveLength(13);
-    expect(freeSkillLibrary.map(s => s.category)).toEqual(['Software engineering', 'UI and UX', 'AI engineering', 'Payments', 'SEO', 'Marketing', 'Communication', 'Legal and compliance', 'Security', 'DevOps', 'Testing', 'Scientific engineering', 'Business and commerce']);
+  it('provides all fifteen categories without executing downloaded scripts', () => {
+    expect(freeSkillLibrary).toHaveLength(15);
+    expect(freeSkillLibrary.map(s => s.category)).toEqual(['Software engineering', 'UI and UX', 'AI engineering', 'Payments', 'SEO', 'Marketing', 'Communication', 'Legal and compliance', 'Security', 'DevOps', 'Testing', 'Scientific engineering', 'Business and commerce', 'Universal agent operations', 'Customer infrastructure sync reliability']);
     expect(freeResourcePolicy.executeDownloadedScripts).toBe(false);
   });
   it('loads relevant skills, not all thirteen', () => {
     const selected = selectSkills('Run vitest unit tests', freeSkillLibrary.map(s => parseSkill(s.name, s.instructions))).selected;
     expect(selected.some(s => s.skill.name === 'free-testing')).toBe(true);
-    expect(selected.length).toBeLessThan(13);
+    expect(selected.length).toBeLessThan(15);
     expect(selected.some(s => s.skill.name === 'free-marketing')).toBe(false);
+  });
+  it('selects the Forge universal operating skill for general agent tasks', () => {
+    const metas = freeSkillLibrary.map(s => parseSkill(s.name, s.instructions));
+    const selected = selectSkills('Upgrade Forge agent to be a general purpose autonomous agent with planning and verification', metas).selected;
+    expect(selected.some(s => s.skill.name === 'free-universal-agent-operations')).toBe(true);
+  });
+  it('selects customer sync reliability guidance for BYO provider synchronization', () => {
+    const metas = freeSkillLibrary.map(s => parseSkill(s.name, s.instructions));
+    const selected = selectSkills('Improve customer GitHub Supabase and Vercel sync reliability with idempotency and webhook reconciliation', metas).selected;
+    expect(selected.some(s => s.skill.name === 'free-customer-infrastructure-sync-reliability')).toBe(true);
   });
   it('rejects paid requirements', () => {
     expect(inspectSkillText('Requires a paid subscription to use this skill')).toContain('Paid requirement');

@@ -17,6 +17,19 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: forge_ci_password
+          POSTGRES_DB: forge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d forge_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
       SUPABASE_URL: https://example.supabase.co
       SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
@@ -39,12 +52,25 @@ jobs:
           bun-version: latest
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
+      - name: Validate cloud bootstrap shell syntax
+        run: bash -n ops/free-cloud/oci-bootstrap.sh
       - name: Typecheck
         run: bunx tsc --noEmit
       - name: Lint changed TypeScript and JavaScript files
         shell: bash
         run: |
-          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts
+          bunx eslint --rule 'prettier/prettier: off' src/lib/accounts.ts src/lib/deployment-env.ts src/lib/deployment-quality.ts src/lib/project-sync-github-adapter.server.ts src/lib/project-sync-executor.server.ts src/lib/project-sync-launch.server.ts src/lib/project-sync-history.server.ts src/lib/project-sync-supabase-adapter.server.ts src/lib/project-sync-vercel-adapter.server.ts src/lib/project-sync-worker-auth.server.ts src/routes/api/agent-background.ts src/test/project-sync-github-adapter.test.ts src/test/project-sync-executor.test.ts src/test/project-sync-launch.test.ts src/test/project-sync-history.test.ts src/test/project-sync-supabase-adapter.test.ts src/test/project-sync-vercel-adapter.test.ts src/test/project-sync-worker-auth.test.ts
+      - name: Execute project sync ledger migration on disposable PostgreSQL
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: forge_ci_password
+          PGDATABASE: forge_ci
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql -v ON_ERROR_STOP=1 -f scripts/verify-project-sync-ledger.sql
       - name: Unit tests
         run: bun run test
       - name: Production build

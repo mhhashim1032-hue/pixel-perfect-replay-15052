@@ -20,8 +20,8 @@ async function call<T>(base: string, token: string, path: string, init: RequestI
 }
 
 export class SupabaseMgmt {
-  constructor(private token: string) {}
-  private req<T = any>(p: string, i?: RequestInit) { return call<T>("https://api.supabase.com/v1", this.token, p, i); }
+  constructor(private token: string, private signal?: AbortSignal) {}
+  private req<T = any>(p: string, i?: RequestInit) { const signal = i?.signal ?? this.signal; return call<T>("https://api.supabase.com/v1", this.token, p, { ...i, ...(signal ? { signal } : {}) }); }
   async projects() {
     const r = await this.req<any[]>("/projects");
     return r.map((p) => ({ ref: p.id as string, name: p.name as string, region: p.region as string, status: p.status as string }));
@@ -69,8 +69,8 @@ export class DeployLimitError extends Error {
 export class Vercel {
   private token: string;
   private teamId: string | null;
-  constructor(packed: string) { const u = unpackVercelToken(packed); this.token = u.token; this.teamId = u.teamId; }
-  private req<T = any>(p: string, i?: RequestInit) { return call<T>("https://api.vercel.com", this.token, withTeam(p, this.teamId), i); }
+  constructor(packed: string, private signal?: AbortSignal) { const u = unpackVercelToken(packed); this.token = u.token; this.teamId = u.teamId; }
+  private req<T = any>(p: string, i?: RequestInit) { const signal = i?.signal ?? this.signal; return call<T>("https://api.vercel.com", this.token, withTeam(p, this.teamId), { ...i, ...(signal ? { signal } : {}) }); }
   user() { return this.req("/v2/user"); }
   /** Teams this token may act on; an Apps token whose app has no permissions is refused here. */
   async teams(): Promise<VercelTeam[]> {

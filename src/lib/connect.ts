@@ -40,7 +40,6 @@ export function customerAuthPatch(cfg: { site_url?: string; uri_allow_list?: str
   const merged = mergeAllowList(cfg.uri_allow_list, requiredAuthUrls(domains));
   const site = pickSiteUrl(cfg.site_url, domains, verifiedCustomDomain);
   return {
-    ...(cfg.mailer_autoconfirm !== true ? { mailer_autoconfirm: true } : {}),
     ...(merged.added.length ? { uri_allow_list: merged.value } : {}),
     ...(site ? { site_url: site } : {}),
   };
@@ -58,14 +57,14 @@ export function autoFixPrompt(steps: SyncStep[], buildErrors: string[]): string 
   if (!problems.length && !buildErrors.length) return null;
   const lines = [
     productionInstructions,
-    "AUTO-FIX: make this project build, deploy and work (including sign-in and sign-out) on the live site.",
-    "Connections were already synced by Forge (database settings in Vercel, sign-in return links, migrations). Remaining blockers:",
+    "AUTO-FIX: repair source-code and build issues, then verify the task-branch preview. Do not promote to production or mutate customer infrastructure.",
+    "Forge inspected the customer connections without changing customer infrastructure. Environment settings, auth configuration and database migrations remain pending explicit review and approval. Remaining blockers:",
     ...problems.map((p) => `- ${p.label}: ${p.note}`),
     ...(buildErrors.length ? ["Latest build errors:", ...buildErrors.slice(0, 12).map((e) => `  ${e}`)] : []),
     "",
-    "Rules: follow the deployment-safe-coding skill; fix root causes in code, not by disabling checks; keep server-only keys out of browser code;",
-    "sign-in must use the current site address for return links and sign-out must clear the session and return to the sign-in page;",
-    "run deployment_preflight, then deploy_status, and repeat at most 3 repair rounds. Finish with one short result: live and working, or the single remaining blocker.",
+    "Rules: follow the deployment-safe-coding skill; fix root causes in code, not by disabling checks; keep server-only keys out of browser code; never write customer environment/auth settings or apply migrations from Auto-fix;",
+    "keep sign-in and sign-out code paths correct, but do not change customer Supabase Auth settings or redirect allow-lists without their separate approval;",
+    "run relevant source-level tests and preview checks; use deploy_status only to inspect an existing deployment, never to trigger production deployment. Repeat at most 3 repair rounds. Finish with one short result: preview verified, or the single remaining blocker.",
   ];
   return lines.join("\n");
 }

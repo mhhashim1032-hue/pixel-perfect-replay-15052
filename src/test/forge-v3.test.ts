@@ -68,6 +68,14 @@ describe("reasoning profiles", () => {
     expect(reasoningOptions("compatible", "some-unknown-model", "deep").providerOptions).toBeUndefined();
     expect(reasoningOptions("openai", "gpt-4o", "deep").providerOptions).toBeUndefined();
   });
+  it("exposes a stable Forge identity and universal operating contract", async () => {
+    const { FORGE_OPERATING_CONTRACT, modelOperatingCapabilities } = await import("@/lib/engine/reasoning");
+    expect(FORGE_OPERATING_CONTRACT).toContain("Identity: Forge");
+    expect(FORGE_OPERATING_CONTRACT).toContain("task-pinned");
+    expect(modelOperatingCapabilities("some-unknown-model")).toEqual({
+      known: false, toolCalling: false, vision: false, reasoningControls: false, contextWindow: null, requiresCapabilityProbe: true,
+    });
+  });
 });
 
 describe("routing and team sizing", () => {

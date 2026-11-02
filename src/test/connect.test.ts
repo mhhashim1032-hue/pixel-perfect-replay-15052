@@ -22,10 +22,10 @@ describe("connect & sync rules", () => {
   it("prefers the registered Vercel production alias over custom domains", () => {
     expect(orderDomains(["my-app-x1.vercel.app", "my-app.vercel.app", "shop.com"])).toEqual(["my-app.vercel.app", "my-app-x1.vercel.app", "shop.com"]);
   });
-  it("disables customer email confirmation with a narrow patch and preserves existing return links", () => {
+  it("preserves customer email confirmation and existing return links", () => {
     const cfg = { mailer_autoconfirm: false, uri_allow_list: "https://old.com/**", site_url: "https://old.com", disable_signup: true, password_hibp_enabled: true };
     const patch = customerAuthPatch(cfg, ["app.vercel.app"]);
-    expect(patch.mailer_autoconfirm).toBe(true);
+    expect(patch).not.toHaveProperty("mailer_autoconfirm");
     expect(patch.site_url).toBe("https://app.vercel.app");
     expect(patch.uri_allow_list).toContain("https://old.com/**");
     expect(patch).not.toHaveProperty("disable_signup");
@@ -38,5 +38,14 @@ describe("connect & sync rules", () => {
   it("Auto-fix has nothing to do when everything passes", () => {
     expect(autoFixPrompt([{ key: "a", label: "A", state: "ok", note: "" }], [])).toBeNull();
     expect(autoFixPrompt([{ key: "b", label: "Build", state: "fail", note: "ERROR" }], ["x"])).toContain("Build: ERROR");
+  });
+  it("Auto-fix never claims customer infrastructure was already changed", () => {
+    const prompt = autoFixPrompt([{ key: "database", label: "Database settings", state: "warn", note: "Pending approval" }], []);
+    expect(prompt).toContain("without changing customer infrastructure");
+    expect(prompt).toContain("never write customer environment/auth settings");
+    expect(prompt).toContain("migrations remain pending explicit review and approval");
+    expect(prompt).toContain("Do not promote to production");
+    expect(prompt).toContain("never to trigger production deployment");
+    expect(prompt).toContain("do not change customer Supabase Auth settings");
   });
 });

@@ -1,4 +1,4 @@
-// "Connect & sync": one pass that wires GitHub + database + Vercel together and reports health.
+// "Connect & sync": read-only inspection of the customer-pinned GitHub, Supabase and Vercel resources.
 import { accountToken } from "./accounts.server";
 import { orderDomains, overall, type SyncStep } from "./connect";
 
@@ -12,10 +12,13 @@ const safe = (e: unknown) => {
   // Provider errors are summarised; never echo credential-bearing bodies.
   if (/permission|403/i.test(m)) return "your saved token doesn't have permission for this";
   if (/401|unauthor/i.test(m)) return "the saved token was rejected; reconnect the account";
-  return m.slice(0, 160);
+  return m
+    .replace(/Bearer\s+[^\s]+/gi, "Bearer [redacted]")
+    .replace(/(access[_-]?token|refresh[_-]?token|api[_-]?key|secret|password)\s*[:=]\s*["'\x27]?[^\s,"'\x27]+/gi, "$1=[redacted]")
+    .slice(0, 160);
 };
 
-export async function syncProject(sb: any, s: Session, opts: { applyMigrations?: boolean } = {}) {
+export async function syncProject(sb: any, s: Session) {
   const steps: SyncStep[] = [];
   const buildErrors: string[] = [];
   const [gt, st, vt] = await Promise.all([
@@ -43,32 +46,19 @@ export async function syncProject(sb: any, s: Session, opts: { applyMigrations?:
     } catch (e) { steps.push({ key: "vercel", label: "Website (Vercel)", state: "fail", note: safe(e) }); }
   }
 
-  // Database settings into Vercel
+  // Connect is deliberately read-only. Customer environment values require the separate Deploy approval flow.
   if (!s.supabase_ref) steps.push({ key: "database", label: "Database", state: "skip", note: st ? "Choose a database in Deploy" : "Not connected" });
   else if (!st) steps.push({ key: "database", label: "Database", state: "fail", note: "Database account missing; reconnect it" });
   else if (s.vercel_project_id && vt) {
-    try {
-      const { syncTaskDatabase } = await import("./deployment-settings.server");
-      await syncTaskDatabase(s.user_id, s.id, s.supabase_ref, s.vercel_project_id, st, vt);
-      steps.push({ key: "database", label: "Database settings in Vercel", state: "ok", note: "Address and public key synced to production, preview and development" });
-    } catch (e) {
-      const m = safe(e);
-      steps.push({ key: "database", label: "Database settings in Vercel", state: "fail", note: /permission|public settings/.test(m) ? "Paste the database URL and public key in Deploy → Database keys" : m });
-    }
+    steps.push({ key: "database", label: "Database settings in Vercel", state: "warn", note: "No environment values were changed. Review and approve the exact settings in Deploy before syncing." });
   } else steps.push({ key: "database", label: "Database", state: "ok", note: "Linked" });
 
-  // Sign-in return links (the usual reason login/logout break after deploy)
+  // Authentication settings (including confirmation and redirect allow-lists) are never changed by Connect.
   if (s.supabase_ref && st) {
-    try {
-      const { syncCustomerAuth } = await import("./customer-auth.server");
-      const { selectedCustomDomain } = await import("./project-setup.server");
-      const domain = s.vercel_project_id && vt ? await selectedCustomDomain(s.user_id, s.id, s.vercel_project_id, s.supabase_ref, st, vt) : undefined;
-      await syncCustomerAuth(s.supabase_ref, st, domains, domain);
-      steps.push({ key: "auth", label: "Signup and sign-in", state: "ok", note: "Email confirmation off; sign-in return links checked" });
-    } catch (e) { steps.push({ key: "auth", label: "Sign-in links", state: "warn", note: `Couldn't check: ${safe(e)}. Use a database token with full access.` }); }
+    steps.push({ key: "auth", label: "Signup and sign-in settings", state: "warn", note: "Authentication settings were not changed. Review any redirect allow-list changes in Deploy; email confirmation settings are preserved." });
   }
 
-  // Migrations
+  // Migration inspection only. Applying migrations is available only through the separate approval flow.
   if (s.supabase_ref && st && gt) {
     try {
       const { GitHub } = await import("./github.server");
@@ -76,17 +66,7 @@ export async function syncProject(sb: any, s: Session, opts: { applyMigrations?:
       const gh = new GitHub(gt);
       const todo = pendingMigrations(await gh.tree(s.repo, s.work_branch), s.applied_migrations ?? []);
       if (!todo.length) steps.push({ key: "migrations", label: "Database changes", state: "ok", note: "All applied" });
-      else {
-        const { migrationNeedsApproval } = await import("./engine/autonomy");
-        let blocked = !opts.applyMigrations;
-        if (!blocked) for (const f of todo) { const c = await gh.getFile(s.repo, s.work_branch, f); if (c && migrationNeedsApproval(s.mode as never, c.content)) { blocked = true; break; } }
-        if (blocked) steps.push({ key: "migrations", label: "Database changes", state: "warn", note: `${todo.length} waiting; apply them in Deploy` });
-        else {
-          const { applySessionMigrations } = await import("./migrations.server");
-          const r = await applySessionMigrations(sb, s, gt, st) as { error?: { file: string; message: string } | null; applied?: string[] };
-          steps.push(r?.error ? { key: "migrations", label: "Database changes", state: "fail", note: `${r.error.file}: ${r.error.message.slice(0, 160)}` } : { key: "migrations", label: "Database changes", state: "ok", note: `Applied ${todo.length}` });
-        }
-      }
+      else steps.push({ key: "migrations", label: "Database changes", state: "warn", note: `${todo.length} pending migration(s); inspect and explicitly approve them in Deploy.` });
     } catch (e) { steps.push({ key: "migrations", label: "Database changes", state: "warn", note: safe(e) }); }
   }
 

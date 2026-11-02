@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forge.invalid/schemas/sync-step.schema.json",
+  "title": "Forge customer infrastructure sync step",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stepId",
+    "jobId",
+    "ownerId",
+    "taskId",
+    "provider",
+    "operation",
+    "idempotencyKey",
+    "state",
+    "attempt"
+  ],
+  "properties": {
+    "stepId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "jobId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ownerId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "enum": [
+        "github",
+        "supabase",
+        "vercel"
+      ]
+    },
+    "accountId": {
+      "type": "string"
+    },
+    "resourceId": {
+      "type": "string"
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceCommitSha": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 16
+    },
+    "desiredStateHash": {
+      "type": "string"
+    },
+    "observedStateHash": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "pending",
+        "running",
+        "succeeded",
+        "retryable_failed",
+        "blocked",
+        "approval_required",
+        "permanent_failed",
+        "cancelled"
+      ]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20
+    },
+    "leaseOwner": {
+      "type": "string"
+    },
+    "leaseExpiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastErrorCode": {
+      "type": "string"
+    },
+    "lastErrorMessage": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "verifiedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
