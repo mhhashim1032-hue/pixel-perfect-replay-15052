@@ -31,6 +31,19 @@ and run finalization.
 be constructed only for Forge's own application database on the server. Do not expose
 service-role credentials to the browser.
 
+## Internal credential isolation
+
+`src/lib/internal-ledger-client.server.ts` is the only approved factory for the worker's
+internal ledger admin client. It requires the dedicated
+`FORGE_INTERNAL_SUPABASE_URL` and `FORGE_INTERNAL_SUPABASE_SERVICE_ROLE_KEY`
+variables. It intentionally does not fall back to generic `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, browser publishable keys, or any credentials stored for a
+customer's connected project. It rejects non-HTTPS remote endpoints and anon JWTs.
+
+The worker must remain disabled until both dedicated variables point to Forge's own
+internal database and migration 0029 has been reviewed and applied there. This change
+does not configure those secrets or enable a worker automatically.
+
 ## RPC contracts
 
 - `project_sync_create_run(...)`: atomically creates an idempotent run and immutable step graph.
