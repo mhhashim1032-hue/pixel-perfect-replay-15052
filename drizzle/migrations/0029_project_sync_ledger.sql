@@ -238,9 +238,9 @@ BEGIN
   END LOOP;
   IF EXISTS (
     SELECT 1 FROM public.project_sync_steps s
-    CROSS JOIN LATERAL unnest(s.depends_on) d
+    CROSS JOIN LATERAL unnest(s.depends_on) AS dependency(step_key)
     WHERE s.run_id = v_run_id AND NOT EXISTS (
-      SELECT 1 FROM public.project_sync_steps p WHERE p.run_id = s.run_id AND p.step_key = d
+      SELECT 1 FROM public.project_sync_steps p WHERE p.run_id = s.run_id AND p.step_key = dependency.step_key
     )
   ) THEN
     RAISE EXCEPTION 'sync graph references an unknown prerequisite' USING ERRCODE = '22023';
