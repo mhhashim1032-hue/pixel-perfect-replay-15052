@@ -12,8 +12,8 @@ export type InternalLedgerConfig = {
 export function resolveInternalLedgerConfig(
   env: Record<string, string | undefined>,
 ): InternalLedgerConfig {
-  const url = env.FORGE_INTERNAL_SUPABASE_URL?.trim();
-  const serviceRoleKey = env.FORGE_INTERNAL_SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const url = env["FORGE_INTERNAL_SUPABASE_URL"]?.trim();
+  const serviceRoleKey = env["FORGE_INTERNAL_SUPABASE_SERVICE_ROLE_KEY"]?.trim();
 
   if (!url || !serviceRoleKey) {
     throw new Error(
