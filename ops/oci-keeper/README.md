@@ -61,7 +61,7 @@ In the Forge app's server-only environment settings (for example Vercel Project 
 
 Redeploy the Forge app after changing environment variables. Never put the shared secret in a VITE_ or NEXT_PUBLIC_ variable, browser code, GitHub repository, or chat message.
 
-When configured, Forge prefers this keeper over E2B. If **FORGE_KEEPER_URL** is absent, the existing optional E2B behavior remains unchanged. If a remote URL is configured but unreachable or misconfigured, Forge fails closed to direct mode rather than silently sending the session token to another provider.
+When configured, Forge prefers this keeper over E2B. If **FORGE_KEEPER_URL** is absent, the existing optional E2B behavior remains unchanged unless **FORGE_DISABLE_E2B_KEEPER=true** is set; that setting disables E2B and leaves the app in direct mode until the remote keeper is configured. Use it if you require zero E2B spend. If a remote URL is configured but unreachable or misconfigured, Forge fails closed to direct mode rather than silently sending the session token to another provider.
 
 ## 4. Operations
 
